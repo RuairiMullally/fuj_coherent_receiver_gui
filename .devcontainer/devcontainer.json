@@ -1,11 +1,9 @@
 {
-  "name": "fuj_coherent_receiver_gui (Python)",
+  "name": "fuj_coherent_receiver_gui (Python + Docker via WSL)",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-  },
-  "postCreateCommand": "python -m pip install --upgrade pip",
+
+  "remoteUser": "root",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -14,5 +12,17 @@
         "ms-azuretools.vscode-docker"
       ]
     }
+  },
+
+  "postCreateCommand": "apt-get update && apt-get install -y docker.io openssh-client git && python -m pip install --upgrade pip",
+
+  "mounts": [
+    "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock",
+    "type=bind,source=/home/ruairi/.ssh,target=/root/.ssh,readonly"
+  ],
+
+  "remoteEnv": {
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+    "GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=accept-new"
   }
 }
