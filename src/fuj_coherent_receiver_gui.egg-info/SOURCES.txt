@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/fuj_coherent_receiver_gui/__init__.py
+src/fuj_coherent_receiver_gui/__main__.py
+src/fuj_coherent_receiver_gui.egg-info/PKG-INFO
+src/fuj_coherent_receiver_gui.egg-info/SOURCES.txt
+src/fuj_coherent_receiver_gui.egg-info/dependency_links.txt
+src/fuj_coherent_receiver_gui.egg-info/requires.txt
+src/fuj_coherent_receiver_gui.egg-info/top_level.txt

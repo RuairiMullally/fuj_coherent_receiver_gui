@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: fuj_coherent_receiver_gui
+Version: 0.1.0
+Summary: Coherent receiver GUI (containerized)
+Requires-Python: >=3.12
+Requires-Dist: pyside6>=6.7

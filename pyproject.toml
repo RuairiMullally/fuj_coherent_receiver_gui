@@ -3,7 +3,9 @@ name = "fuj_coherent_receiver_gui"
 version = "0.1.0"
 description = "Coherent receiver GUI (containerized)"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pyside6>=6.7"
+]
 
 [build-system]
 requires = ["setuptools>=68"]

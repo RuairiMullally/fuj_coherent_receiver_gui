@@ -14,7 +14,7 @@
     }
   },
 
-  "postCreateCommand": "apt-get update && apt-get install -y docker.io openssh-client git && python -m pip install --upgrade pip",
+  "postCreateCommand": "apt-get update && apt-get install -y docker.io openssh-client git libgl1 libegl1 libxkbcommon-x11-0 libxcb-xinerama0 libxcb-cursor0 libx11-xcb1 libxcb1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render0 libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb-xkb1 && python -m pip install --upgrade pip && pip install -e .",
 
   "mounts": [
     "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock",
@@ -23,6 +23,7 @@
 
   "remoteEnv": {
     "DOCKER_HOST": "unix:///var/run/docker.sock",
-    "GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=accept-new"
+    "GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=accept-new",
+    "QT_QPA_PLATFORM": "xcb"
   }
 }
