@@ -1,2 +1,2 @@
 fuj_backend
-fuj_coherent_receiver_gui
+fuj_gui
