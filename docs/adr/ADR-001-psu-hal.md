@@ -40,6 +40,8 @@ We will implement a **synchronous Hardware Abstraction Layer (HAL)** with the fo
 - Network communication details are isolated in a `PsuTransportUDP` class
 - The PSU logic never directly manipulates sockets
 - Alternative transports (USB, serial, TCP) may be added later without changing the public API
+- UDP socket is created once and kept open for the lifetime of the transport (persistent binding)
+- Transport supports context manager protocol for automatic cleanup
 
 ### 3. Command execution model
 - All HAL calls are **synchronous and blocking**
@@ -67,6 +69,12 @@ We will implement a **synchronous Hardware Abstraction Layer (HAL)** with the fo
 - Network configuration commands (IP, DHCP, port) are logically separated and not part of normal operation paths
 - Persistence, orchestration, and user-facing APIs are out of scope for this layer
 
+### 7. Logging
+- All commands sent (TX) and responses received (RX) are logged to a dedicated file
+- Log file: `logs/psu_hal.log` with daily rotation (30-day retention)
+- Log entries include timestamp, PSU IP, direction, channel (if applicable), and command/response
+- Logging is automatic and requires no configuration
+
 ---
 
 ## Consequences
@@ -80,7 +88,6 @@ We will implement a **synchronous Hardware Abstraction Layer (HAL)** with the fo
 
 ### Trade-offs
 - Blocking calls may reduce throughput if a single PSU is heavily polled
-- UDP sockets are created per command (simple but not maximally efficient)
 - Validation and safety enforcement are deferred to higher layers
 
 ---
@@ -88,7 +95,6 @@ We will implement a **synchronous Hardware Abstraction Layer (HAL)** with the fo
 ## Future considerations
 
 - Optional async wrappers (`asyncio.to_thread`) may be added without changing the core API
-- Transport reuse (persistent sockets) may be evaluated if performance becomes critical
 - Formal safety rules and parameter validation may be layered on top
 - Support for additional PSU models can reuse the same object model
 

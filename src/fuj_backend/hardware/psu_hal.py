@@ -1,9 +1,43 @@
 from __future__ import annotations
+import logging
+import re
 import socket
 import time
 import threading
 from dataclasses import dataclass
+from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 from typing import Iterable, Optional, Union
+
+
+def _setup_psu_logger() -> logging.Logger:
+    """Configure dedicated PSU HAL logger with daily rotation."""
+    logger = logging.getLogger("psu_hal")
+    if logger.handlers:
+        return logger  # Already configured
+
+    logger.setLevel(logging.DEBUG)
+
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / "psu_hal.log"
+
+    handler = TimedRotatingFileHandler(
+        log_file,
+        when="midnight",
+        backupCount=30,  # Keep 30 days of logs
+        encoding="utf-8",
+    )
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s.%(msecs)03d | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logger.addHandler(handler)
+
+    return logger
+
+
+_psu_logger = _setup_psu_logger()
 
 Channels = Union[int, Iterable[int], None]  # None => all
 
@@ -20,11 +54,18 @@ class Status:
     mode: tuple[str, str, str, str]      # "CV"/"CC"
     output: tuple[bool, bool, bool, bool]
 
+def _extract_channel(cmd: str) -> Optional[str]:
+    """Extract channel number(s) from command string, if present."""
+    match = re.match(r'^[A-Z*]+(\d+)', cmd.upper())
+    return match.group(1) if match else None
+
+
 class PsuTransportUDP:
     """
     UDP transport for MP71050x.
 
-    In practice, replies are reliable when the client binds local UDP port == device port. :contentReference[oaicite:4]{index=4}
+    In practice, replies are reliable when the client binds local UDP port == device port.
+    Socket is created once and kept open for the lifetime of the transport.
     """
     def __init__(
         self,
@@ -41,34 +82,57 @@ class PsuTransportUDP:
         self.local_port = local_port
         self.term = term
         self.timeout_s = timeout_s
+        self._logger = _psu_logger
 
-    def _sock(self) -> socket.socket:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(self.timeout_s)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Create persistent socket
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._sock.settimeout(self.timeout_s)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if self.local_port is not None:
             bind_ip = self.local_ip if self.local_ip is not None else ""
-            s.bind((bind_ip, self.local_port))
-        return s
+            self._sock.bind((bind_ip, self.local_port))
+
+    def _log(self, direction: str, cmd: str, response: Optional[str] = None) -> None:
+        """Log a command or response with channel info if available."""
+        channel = _extract_channel(cmd)
+        ch_str = f"CH{channel} | " if channel else ""
+
+        if direction == "TX":
+            self._logger.debug(f"{self.psu_ip} | TX | {ch_str}{cmd}")
+        elif direction == "RX" and response is not None:
+            self._logger.debug(f"{self.psu_ip} | RX | {ch_str}{response}")
 
     def write(self, cmd: str) -> None:
         msg = cmd.encode("ascii") + self.term
-        with self._sock() as s:
-            s.sendto(msg, (self.psu_ip, self.psu_port))
+        self._sock.sendto(msg, (self.psu_ip, self.psu_port))
+        self._log("TX", cmd)
         time.sleep(0.03)
 
     def query_raw(self, cmd: str) -> bytes:
         msg = cmd.encode("ascii") + self.term
-        with self._sock() as s:
-            s.sendto(msg, (self.psu_ip, self.psu_port))
-            data, addr = s.recvfrom(4096)
-            # Optional: sanity check
-            if addr[0] != self.psu_ip:
-                raise RuntimeError(f"Unexpected reply from {addr}, expected {self.psu_ip}")
-            return data
+        self._sock.sendto(msg, (self.psu_ip, self.psu_port))
+        self._log("TX", cmd)
+        data, addr = self._sock.recvfrom(4096)
+        if addr[0] != self.psu_ip:
+            raise RuntimeError(f"Unexpected reply from {addr}, expected {self.psu_ip}")
+        response = data.decode("ascii", errors="replace").strip()
+        self._log("RX", cmd, response)
+        return data
 
     def query_str(self, cmd: str) -> str:
         return self.query_raw(cmd).decode("ascii", errors="replace").strip()
+
+    def close(self) -> None:
+        """Close the UDP socket."""
+        if self._sock:
+            self._sock.close()
+            self._sock = None
+
+    def __enter__(self) -> "PsuTransportUDP":
+        return self
+
+    def __exit__(self, _exc_type, _exc_val, _exc_tb) -> None:
+        self.close()
 
 class MP71050x:
     """

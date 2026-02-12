@@ -44,8 +44,9 @@ Represents the *network connection settings* used to talk to a PSU.
 
 **What it represents**
 
-* The PSU’s destination IP/UDP port
+* The PSU's destination IP/UDP port
 * The local bind IP/port (often set to match PSU port)
+* A persistent UDP socket (created once, kept open for the transport's lifetime)
 
 **Constructor**
 
@@ -58,6 +59,23 @@ PsuTransportUDP(
     term: bytes = b"\n",
     timeout_s: float = 2.0,
 )
+```
+
+**Methods**
+
+```python
+close() -> None              # Close the UDP socket
+```
+
+**Context manager support**
+
+The transport can be used as a context manager for automatic cleanup:
+
+```python
+with PsuTransportUDP("10.10.10.137", 20001) as transport:
+    psu = MP71050x("PSU_A", transport)
+    # ... use psu ...
+# Socket automatically closed here, even if an exception occurred
 ```
 
 **When using multiple PSUs**
@@ -279,6 +297,40 @@ current_step_down() -> None
 
 ---
 
+## Logging
+
+All PSU communication is automatically logged to a dedicated file for debugging and auditing.
+
+**Log location:** `logs/psu_hal.log` (relative to working directory)
+
+**Rotation:** Daily at midnight, with 30-day retention (`psu_hal.log.2026-02-11`, etc.)
+
+**Log format:**
+
+```
+2026-02-12 10:30:45.123 | 10.10.10.137 | TX | CH1 | VSET1:5.000
+2026-02-12 10:30:45.156 | 10.10.10.137 | TX | CH1 | VSET1?
+2026-02-12 10:30:45.189 | 10.10.10.137 | RX | CH1 | 5.000
+2026-02-12 10:30:45.220 | 10.10.10.137 | TX | *IDN?
+2026-02-12 10:30:45.253 | 10.10.10.137 | RX | MP710508 V1.0 SN:12345
+```
+
+**Fields:**
+
+* Timestamp (millisecond precision)
+* PSU IP address
+* Direction: `TX` (sent) or `RX` (received)
+* Channel (if command is channel-specific, e.g., `CH1`, `CH1234`)
+* Command or response content
+
+**Notes:**
+
+* Logging is automatic—no configuration required
+* The `logs/` directory is created automatically if it doesn't exist
+* For Docker deployments, mount the `logs/` directory to persist logs
+
+---
+
 ## Recommended multi-PSU setup
 
 Assign each PSU a unique UDP port and match local binds:
@@ -436,6 +488,8 @@ Recommendation:
 * **OVP/OCP**: Over-voltage / Over-current protection
 * **LIST**: Programmable sequence table (steps of V/I/dwell)
 * **Stepping**: Incrementing setpoints either manually or automatically
+* **TX/RX**: Transmit (command sent to PSU) / Receive (response from PSU)
+* **Context manager**: Python pattern (`with` statement) for automatic resource cleanup
 
 ---
 
