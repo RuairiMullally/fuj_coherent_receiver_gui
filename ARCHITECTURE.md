@@ -37,11 +37,21 @@
 │  │                   SERVICES LAYER (services/)                      │ │
 │  │                                                                   │ │
 │  │  ┌──────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │ │
-│  │  │  state.py        │  │ validation.py   │  │   startup.py    │ │ │
+│  │  │ FIM24725Service  │  │ RailController  │  │  StateMachine   │ │ │
 │  │  │                  │  │                 │  │                 │ │ │
-│  │  │ • status         │  │ • bounds check  │  │ • initialization│ │ │
-│  │  │ • channels {}    │  │ • range limits  │  │ • algorithm     │ │ │
-│  │  │ • locks {}       │  │ • safety rules  │  │ • sequencing    │ │ │
+│  │  │ • startup()      │  │ • set_voa()     │  │ • state         │ │ │
+│  │  │ • shutdown()     │  │ • set_oa_x/y()  │  │ • transitions   │ │ │
+│  │  │ • set_mode()     │  │ • set_ga_x/y()  │  │ • fault()       │ │ │
+│  │  │ • get_snapshot() │  │ • bounds check  │  │ • callbacks     │ │ │
+│  │  └──────────────────┘  └─────────────────┘  └─────────────────┘ │ │
+│  │                                                                   │ │
+│  │  ┌──────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │ │
+│  │  │  RailRegistry    │  │  MCUInterface   │  │     models      │ │ │
+│  │  │                  │  │                 │  │                 │ │ │
+│  │  │ • VCC_3V3        │  │ • set_shutdown()│  │ • SystemState   │ │ │
+│  │  │ • VPD_5V0        │  │ • set_mode()    │  │ • RailName      │ │ │
+│  │  │ • VOA_CTRL       │  │ • read_pi()     │  │ • PeakIndicators│ │ │
+│  │  │ • GA_X/Y, OA_X/Y │  │ • MockMCU       │  │ • SystemSnapshot│ │ │
 │  │  └──────────────────┘  └─────────────────┘  └─────────────────┘ │ │
 │  └───────────────────────────────────────────────────────────────────┘ │
 │                              ↓                                          │
@@ -118,3 +128,18 @@ The HAL exposes the full command surface but does **not** enforce safety policie
 
 For the complete design rationale, see [ADR-001: PSU Hardware Abstraction Layer](docs/adr/ADR-001-psu-hal.md).
 For the full API reference, see [PSU HAL API Documentation](docs/psu_hal_api.md).
+
+## Services Layer Design Notes
+
+The Services Layer provides high-level control of the FIM24725 coherent optical receiver:
+
+- **`FIM24725Service`** -- Main facade providing startup/shutdown sequences, named rail control, and state management
+- **`RailController`** -- Maps named rails (VCC_3V3, VOA_CTRL, GA_X, etc.) to PSU/channel pairs with bounds enforcement
+- **`StateMachine`** -- Enforces valid state transitions (OFF → STARTING → READY → SHUTTING_DOWN)
+- **`RailRegistry`** -- Single source of truth for rail configuration (OVP, OCP, bounds)
+- **`MCUInterface`** -- Protocol for external MCU communication (MockMCU for development)
+
+The services layer composes HAL objects internally and enforces safety policies that the HAL intentionally omits.
+
+For the complete design rationale, see [ADR-002: FIM24725 Services Layer](docs/adr/ADR-002-services-layer.md).
+For the full API reference, see [Services API Documentation](docs/services_api.md).
