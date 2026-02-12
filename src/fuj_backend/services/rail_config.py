@@ -21,11 +21,12 @@ class RailRegistry:
         psu_name="PSU1",
         channel=1,
         nominal_voltage=3.300,
+        nominal_current=0.720,
         max_voltage=3.300,
         ovp=3.600,
         ocp=0.800,
         verify_voltage=(3.135, 3.465),  # VCC op: 3.135-3.465V
-        verify_current=(0.360, 0.400),  # Icc 360-400mA
+        verify_current=(0.720, 0.800),  # Icc 360-400mA x2 (X+Y)
     )
 
     VPD_5V0: ClassVar[RailConfig] = RailConfig(
@@ -33,6 +34,7 @@ class RailRegistry:
         psu_name="PSU1",
         channel=2,
         nominal_voltage=5.000,
+        nominal_current=0.200,
         max_voltage=5.000,
         ovp=5.500,
         ocp=0.200,
@@ -43,7 +45,8 @@ class RailRegistry:
         name=RailName.VOA_CTRL,
         psu_name="PSU1",
         channel=3,
-        nominal_voltage=0.0,
+        nominal_voltage=2.500,
+        nominal_current=0.080,
         max_voltage=4.800,  # Max VOA voltage
         ovp=5.000,
         ocp=0.100,  # Max current 80mA, OCP at 100mA
@@ -55,6 +58,7 @@ class RailRegistry:
         psu_name="PSU2",
         channel=1,
         nominal_voltage=0.0,
+        nominal_current=0.020,
         max_voltage=3.300,  # Range 0-VCC
         ovp=3.600,
         ocp=0.020,
@@ -65,6 +69,7 @@ class RailRegistry:
         psu_name="PSU2",
         channel=2,
         nominal_voltage=0.0,
+        nominal_current=0.020,
         max_voltage=3.300,  # Range 0-VCC
         ovp=3.600,
         ocp=0.020,
@@ -75,6 +80,7 @@ class RailRegistry:
         psu_name="PSU2",
         channel=3,
         nominal_voltage=0.0,
+        nominal_current=0.020,
         max_voltage=3.300,  # Range 0-VCC
         ovp=3.600,
         ocp=0.020,
@@ -85,6 +91,7 @@ class RailRegistry:
         psu_name="PSU2",
         channel=4,
         nominal_voltage=0.0,
+        nominal_current=0.020,
         max_voltage=3.300,  # Range 0-VCC
         ovp=3.600,
         ocp=0.020,

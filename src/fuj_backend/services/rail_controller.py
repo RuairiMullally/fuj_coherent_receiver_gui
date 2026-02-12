@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fuj_backend.hardware.psu_hal import Channel, MP71050x
+from ..hardware.psu_hal import Channel, MP71050x
 
 from .exceptions import BoundsError
 from .logging import get_service_logger
@@ -103,11 +103,13 @@ class RailController:
         ch = self._get_channel(rail)
 
         self._logger.info(
-            f"{rail.value}: Programming OVP={config.ovp:.3f}V, OCP={config.ocp:.3f}A"
+            f"{rail.value}: Programming OVP={config.ovp:.3f}V, OCP={config.ocp:.3f}A, "
+            f"Vset={config.nominal_voltage:.3f}V, Iset={config.nominal_current:.3f}A"
         )
         ch.set_ovp(config.ovp, enabled=True)
         ch.set_ocp(config.ocp, enabled=True)
-        ch.set_current_limit(config.ocp)
+        ch.set_voltage(config.nominal_voltage)
+        ch.set_current_limit(config.nominal_current)
 
     def program_all_protections(self) -> None:
         """Program protections for all rails."""

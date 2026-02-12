@@ -5,7 +5,9 @@ This package provides:
 - services: High-level service layer for FIM24725 control
 """
 
-from fuj_backend.services import (
+from __future__ import annotations
+
+from .services import (
     FIM24725Service,
     FaultInfo,
     MCUInterface,

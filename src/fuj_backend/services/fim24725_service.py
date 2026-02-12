@@ -20,7 +20,7 @@ import time
 from functools import wraps
 from typing import Callable, Optional, TypeVar
 
-from fuj_backend.hardware.psu_hal import MP71050x, PsuTransportUDP
+from ..hardware.psu_hal import MP71050x, PsuTransportUDP
 
 from .exceptions import MCUError, VerificationError
 from .logging import get_service_logger
@@ -96,6 +96,8 @@ class FIM24725Service:
         psu1_port: int,
         psu2_ip: str,
         psu2_port: int,
+        psu1_local_ip: Optional[str] = None,
+        psu2_local_ip: Optional[str] = None,
         mcu: Optional[MCUInterface] = None,
     ) -> None:
         """
@@ -106,6 +108,9 @@ class FIM24725Service:
             psu1_port: UDP port for PSU1
             psu2_ip: IP address of PSU2 (GA, OA controls)
             psu2_port: UDP port for PSU2
+            psu1_local_ip: Local NIC IP to bind for PSU1 (required when
+                           each PSU is on a separate ethernet adapter)
+            psu2_local_ip: Local NIC IP to bind for PSU2
             mcu: MCU interface implementation (defaults to MockMCU)
         """
         # Initialize logger first (ensures file handler is set up)
@@ -116,10 +121,10 @@ class FIM24725Service:
 
         # Initialize HAL connections
         self._transport1 = PsuTransportUDP(
-            psu1_ip, psu_port=psu1_port, local_port=psu1_port
+            psu1_ip, psu_port=psu1_port, local_ip=psu1_local_ip, local_port=psu1_port
         )
         self._transport2 = PsuTransportUDP(
-            psu2_ip, psu_port=psu2_port, local_port=psu2_port
+            psu2_ip, psu_port=psu2_port, local_ip=psu2_local_ip, local_port=psu2_port
         )
         self._psu1 = MP71050x("PSU1", self._transport1)
         self._psu2 = MP71050x("PSU2", self._transport2)
@@ -210,10 +215,10 @@ class FIM24725Service:
 
         Follows the bring-up algorithm:
         1. Verify safe initial state
-        2. Program OVP/OCP protections
+        2. Program protections and setpoints (OVP/OCP/Vset/Iset per config)
         3. Enable VCC, verify
         4. Enable VPD, verify
-        5. Set initial controls
+        5. Set initial control values
         6. Enable control rails
         7. Settling delay
         8. Enable module output (SD = ENABLE)
@@ -237,7 +242,7 @@ class FIM24725Service:
             # Step 1: Verify initial safe state
             self._ensure_safe_initial_state()
 
-            # Step 2: Program all protections
+            # Step 2: Program all protections (sets OVP/OCP/Vset/Iset per config)
             self._program_protections()
 
             # Step 3: Enable VCC, verify
@@ -292,8 +297,8 @@ class FIM24725Service:
         self._rails.disable_all_rails()
 
     def _program_protections(self) -> None:
-        """Program OVP/OCP for all rails."""
-        self._logger.info("Step 2: Programming protections")
+        """Program OVP/OCP and setpoints for all rails."""
+        self._logger.info("Step 2: Programming protections and setpoints")
         self._rails.program_all_protections()
 
     def _enable_vcc(self) -> None:
@@ -306,7 +311,7 @@ class FIM24725Service:
             measurement = self._rails.measure_rail(RailName.VCC_3V3)
             raise VerificationError(
                 RailName.VCC_3V3,
-                "3.3V / 360-400mA",
+                "3.3V / 720-800mA",
                 f"{measurement.voltage:.3f}V / {measurement.current:.3f}A",
             )
 
@@ -325,29 +330,21 @@ class FIM24725Service:
             )
 
     def _set_initial_controls(self) -> None:
-        """Set initial control values (GA/OA=0, VOA low)."""
+        """Set initial control values from rail config (nominal_voltage)."""
         self._logger.info("Step 5: Setting initial control values")
 
-        # Set voltages before enabling outputs
-        # Get channels directly to set before enable
-        for rail in [RailName.GA_X, RailName.GA_Y, RailName.OA_X, RailName.OA_Y]:
+        for rail in RailRegistry.CONTROL_RAILS:
+            config = RailRegistry.get(rail)
             ch = self._rails._get_channel(rail)
-            ch.set_voltage(0.0)
-
-        # VOA starts low (allows signal through)
-        voa_ch = self._rails._get_channel(RailName.VOA_CTRL)
-        voa_ch.set_voltage(0.5)
+            ch.set_voltage(config.nominal_voltage)
+            ch.set_current_limit(config.nominal_current)
 
     def _enable_control_rails(self) -> None:
         """Enable control rail outputs."""
         self._logger.info("Step 6: Enabling control rails")
 
-        # Enable VOA
-        self._rails.enable_rail(RailName.VOA_CTRL, initial_voltage=0.5)
-
-        # Enable GA and OA rails at 0V
-        for rail in [RailName.GA_X, RailName.GA_Y, RailName.OA_X, RailName.OA_Y]:
-            self._rails.enable_rail(rail, initial_voltage=0.0)
+        for rail in RailRegistry.CONTROL_RAILS:
+            self._rails.enable_rail(rail)
 
     def _enable_module_output(self, mode: OperatingMode) -> None:
         """Enable module output (SD = ENABLE)."""

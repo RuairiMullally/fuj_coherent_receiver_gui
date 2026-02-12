@@ -14,13 +14,13 @@ This script exercises many functions across the command surface.
 """
 
 import time
-from PSU_HAL import PsuTransportUDP, MP71050x
+from src.fuj_backend.hardware.psu_hal import PsuTransportUDP, MP71050x
 
 # ---------- configure ----------
-PSU_IP = "10.10.10.137"
-PSU_PORT = 20001
-LOCAL_IP = "10.10.10.50"
-LOCAL_PORT = 20001
+PSU_IP = "10.10.10.138"
+PSU_PORT = 20002
+LOCAL_IP = "10.10.10.51"
+LOCAL_PORT = 20002
 
 CH = 1  # we primarily test Channel 1
 

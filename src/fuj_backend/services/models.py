@@ -52,6 +52,7 @@ class RailConfig(BaseModel):
     psu_name: str  # "PSU1" or "PSU2"
     channel: int = Field(ge=1, le=4)
     nominal_voltage: float
+    nominal_current: float
     min_voltage: float = 0.0
     max_voltage: float
     ovp: float

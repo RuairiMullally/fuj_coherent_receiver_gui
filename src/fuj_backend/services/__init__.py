@@ -24,6 +24,8 @@ Example:
         service.shutdown()
 """
 
+from __future__ import annotations
+
 from .exceptions import (
     BoundsError,
     FIM24725Error,

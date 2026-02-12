@@ -1,6 +1,8 @@
 """Hardware abstraction layer for lab instruments."""
 
-from fuj_backend.hardware.psu_hal import (
+from __future__ import annotations
+
+from .psu_hal import (
     Channels,
     Channel,
     DeviceId,
