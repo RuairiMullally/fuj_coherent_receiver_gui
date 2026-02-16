@@ -174,6 +174,34 @@ class FIM24725Service:
         except Exception as e:
             self._logger.error(f"Rail disable failed: {e}")
 
+    # --- MCU verification helpers ---
+
+    def _set_sd_verified(self, disable: bool) -> None:
+        """Set SD state and verify MCU confirmation.
+
+        Raises:
+            MCUError: If MCU returns a state that doesn't match expected.
+        """
+        actual = self._mcu.set_shutdown(disable)
+        if actual != disable:
+            expected_str = "DISABLED" if disable else "ENABLED"
+            actual_str = "DISABLED" if actual else "ENABLED"
+            raise MCUError(
+                f"SD state mismatch: expected {expected_str}, got {actual_str}"
+            )
+
+    def _set_mode_verified(self, mode: OperatingMode) -> None:
+        """Set mode and verify MCU confirmation.
+
+        Raises:
+            MCUError: If MCU returns a mode that doesn't match expected.
+        """
+        actual = self._mcu.set_mode(mode)
+        if actual != mode:
+            raise MCUError(
+                f"Mode mismatch: expected {mode.value}, got {actual.value}"
+            )
+
     # --- Properties (thread-safe) ---
 
     @property
@@ -290,8 +318,8 @@ class FIM24725Service:
             raise MCUError("MCU not responding")
 
         # Ensure SD disabled, AGC mode (safe defaults)
-        self._mcu.set_shutdown(disable=True)
-        self._mcu.set_mode(OperatingMode.AGC)
+        self._set_sd_verified(True)
+        self._set_mode_verified(OperatingMode.AGC)
 
         # Ensure all outputs off
         self._rails.disable_all_rails()
@@ -305,7 +333,7 @@ class FIM24725Service:
         """Enable VCC rail and verify."""
         self._logger.info("Step 3: Enabling VCC_3V3")
         self._rails.enable_rail(RailName.VCC_3V3)
-        time.sleep(0.050)  # Brief settling
+        time.sleep(0.500)  # Brief settling
 
         if not self._rails.verify_rail(RailName.VCC_3V3):
             measurement = self._rails.measure_rail(RailName.VCC_3V3)
@@ -349,9 +377,9 @@ class FIM24725Service:
     def _enable_module_output(self, mode: OperatingMode) -> None:
         """Enable module output (SD = ENABLE)."""
         self._logger.info(f"Step 8: Enabling output (mode={mode.value})")
-        self._mcu.set_mode(mode)
+        self._set_mode_verified(mode)
         self._state.set_mode(mode)
-        self._mcu.set_shutdown(disable=False)  # SD = ENABLE (LOW)
+        self._set_sd_verified(False)  # SD = ENABLE (LOW)
 
     def _validate_peak_indicators(self) -> None:
         """Validate PI readings are not railed."""
@@ -548,7 +576,7 @@ class FIM24725Service:
             StateError: If system not ready or during startup
         """
         self._state.require_state(SystemState.READY)
-        self._mcu.set_mode(mode)
+        self._set_mode_verified(mode)
         self._state.set_mode(mode)
 
         # In AGC mode, hold GA at safe value

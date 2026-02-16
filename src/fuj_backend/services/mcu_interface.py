@@ -15,6 +15,7 @@ Signals read by MCU:
 
 from __future__ import annotations
 
+import random
 from typing import Protocol
 
 from .logging import get_service_logger
@@ -28,22 +29,38 @@ class MCUInterface(Protocol):
     digital signals via the external MCU.
     """
 
-    def set_shutdown(self, disable: bool) -> None:
-        """Set SD pin state.
+    def set_shutdown(self, disable: bool) -> bool:
+        """Set SD pin state. Returns actual SD state after setting.
 
         Args:
             disable: True sets SD HIGH (module disabled/shutdown),
                      False sets SD LOW (module enabled/active).
+
+        Returns:
+            Actual SD state: True if disabled, False if enabled.
         """
         ...
 
-    def set_mode(self, mode: OperatingMode) -> None:
-        """Set MC/AGC pin for gain control mode.
+    def set_mode(self, mode: OperatingMode) -> OperatingMode:
+        """Set MC/AGC pin for gain control mode. Returns actual mode.
 
         Args:
             mode: AGC sets pin HIGH (automatic gain control),
                   MGC sets pin LOW (manual gain control).
+
+        Returns:
+            Actual operating mode confirmed by MCU.
         """
+        ...
+
+    @property
+    def sd_disabled(self) -> bool:
+        """Current SD pin state. True = module disabled (HIGH)."""
+        ...
+
+    @property
+    def mode(self) -> OperatingMode:
+        """Current MC/AGC mode setting."""
         ...
 
     def read_peak_indicators(self) -> PeakIndicators:
@@ -86,27 +103,34 @@ class MockMCU:
         self._mode = OperatingMode.AGC  # Default to AGC
         self._connected = True
 
-    def set_shutdown(self, disable: bool) -> None:
-        """Set SD pin state (simulated)."""
+    def set_shutdown(self, disable: bool) -> bool:
+        """Set SD pin state (simulated). Returns actual state."""
         self._sd_disabled = disable
         state = "DISABLE (HIGH)" if disable else "ENABLE (LOW)"
         self._logger.info(f"SD -> {state}")
+        return self._sd_disabled
 
-    def set_mode(self, mode: OperatingMode) -> None:
-        """Set MC/AGC pin (simulated)."""
+    def set_mode(self, mode: OperatingMode) -> OperatingMode:
+        """Set MC/AGC pin (simulated). Returns actual mode."""
         self._mode = mode
         pin_state = "HIGH" if mode == OperatingMode.AGC else "LOW"
         self._logger.info(f"MC/AGC -> {mode.value} ({pin_state})")
+        return self._mode
 
     def read_peak_indicators(self) -> PeakIndicators:
-        """Return mock mid-range PI values."""
+        """Return random PI values within valid range."""
         self._logger.debug("Reading PI channels (mock)")
-        return PeakIndicators(pi_xi=1.0, pi_xq=1.0, pi_yi=1.0, pi_yq=1.0)
+        return PeakIndicators(
+            pi_xi=random.uniform(0.0, 2.0),
+            pi_xq=random.uniform(0.0, 2.0),
+            pi_yi=random.uniform(0.0, 2.0),
+            pi_yq=random.uniform(0.0, 2.0),
+        )
 
     def read_mpd(self) -> float:
-        """Return mock MPD value."""
+        """Return random MPD value within valid range."""
         self._logger.debug("Reading MPD (mock)")
-        return 0.5
+        return random.uniform(0.0, 1.0)
 
     def is_connected(self) -> bool:
         """Return mock connection status."""

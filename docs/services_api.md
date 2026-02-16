@@ -448,12 +448,22 @@ from fuj_backend.services import MCUInterface, OperatingMode, PeakIndicators
 class MySerialMCU:
     """Custom serial MCU implementation."""
 
-    def set_shutdown(self, disable: bool) -> None:
-        # Send command to set SD pin
+    def set_shutdown(self, disable: bool) -> bool:
+        # Send command to set SD pin, return confirmed state
         ...
 
-    def set_mode(self, mode: OperatingMode) -> None:
-        # Send command to set MC/AGC pin
+    def set_mode(self, mode: OperatingMode) -> OperatingMode:
+        # Send command to set MC/AGC pin, return confirmed mode
+        ...
+
+    @property
+    def sd_disabled(self) -> bool:
+        # Query current SD pin state
+        ...
+
+    @property
+    def mode(self) -> OperatingMode:
+        # Query current MC/AGC mode
         ...
 
     def read_peak_indicators(self) -> PeakIndicators:
@@ -476,6 +486,12 @@ service = FIM24725Service(
     mcu=mcu,
 )
 ```
+
+**Set-Confirm Pattern:** The `set_shutdown()` and `set_mode()` methods return
+the actual MCU state after applying the command. The service verifies these
+return values match the expected state and raises `MCUError` on mismatch.
+This ensures the MCU actually applied the requested change before the service
+updates its own state machine.
 
 ---
 

@@ -19,7 +19,7 @@ from src.fuj_backend.hardware.psu_hal import PsuTransportUDP, MP71050x
 # ---------- configure ----------
 PSU_IP = "10.10.10.138"
 PSU_PORT = 20002
-LOCAL_IP = "10.10.10.51"
+LOCAL_IP = "10.10.10.50"
 LOCAL_PORT = 20002
 
 CH = 1  # we primarily test Channel 1
