@@ -174,6 +174,24 @@ class FIM24725Service:
         except Exception as e:
             self._logger.error(f"Rail disable failed: {e}")
 
+    # --- MCU error → fault helper ---
+
+    def _fault_on_mcu_error(self, context: str, e: MCUError) -> None:
+        """Transition to FAULT state on an MCU communication error.
+
+        Args:
+            context: Brief description of the operation that failed.
+            e: The MCUError that was caught.
+        """
+        self._logger.error(f"MCU error during {context}: {e}")
+        self._state.fault(
+            FaultInfo(
+                message=f"MCU error during {context}: {e}",
+                timestamp=time.time(),
+                recoverable=False,
+            )
+        )
+
     # --- MCU verification helpers ---
 
     def _set_sd_verified(self, disable: bool) -> None:
@@ -574,9 +592,14 @@ class FIM24725Service:
 
         Raises:
             StateError: If system not ready or during startup
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
         """
         self._state.require_state(SystemState.READY)
-        self._set_mode_verified(mode)
+        try:
+            self._set_mode_verified(mode)
+        except MCUError as e:
+            self._fault_on_mcu_error("set_mode", e)
+            raise
         self._state.set_mode(mode)
 
         # In AGC mode, hold GA at safe value
@@ -628,8 +651,15 @@ class FIM24725Service:
 
         Returns:
             PeakIndicators with all 4 channel readings
+
+        Raises:
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
         """
-        return self._mcu.read_peak_indicators()
+        try:
+            return self._mcu.read_peak_indicators()
+        except MCUError as e:
+            self._fault_on_mcu_error("read_peak_indicators", e)
+            raise
 
     @synchronized
     def read_mpd(self) -> float:
@@ -641,8 +671,15 @@ class FIM24725Service:
 
         Returns:
             MPD reading value
+
+        Raises:
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
         """
-        return self._mcu.read_mpd()
+        try:
+            return self._mcu.read_mpd()
+        except MCUError as e:
+            self._fault_on_mcu_error("read_mpd", e)
+            raise
 
     # --- Advanced Operations ---
 
