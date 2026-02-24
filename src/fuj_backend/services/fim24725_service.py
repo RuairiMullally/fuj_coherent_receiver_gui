@@ -88,7 +88,7 @@ class FIM24725Service:
         # Automatic shutdown and cleanup
     """
 
-    SETTLING_TIME_MS: int = 100  # Default settling time in milliseconds
+    SETTLING_TIME_MS: int = 500  # Default settling time in milliseconds
 
     def __init__(
         self,
@@ -347,7 +347,7 @@ class FIM24725Service:
         """Enable VPD rail and verify."""
         self._logger.info("Step 4: Enabling VPD_5V0")
         self._rails.enable_rail(RailName.VPD_5V0)
-        time.sleep(0.050)
+        time.sleep(0.500)  # 500ms settling for VPD_5V0
 
         if not self._rails.verify_rail(RailName.VPD_5V0):
             measurement = self._rails.measure_rail(RailName.VPD_5V0)

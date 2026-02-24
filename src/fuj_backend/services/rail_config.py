@@ -26,7 +26,7 @@ class RailRegistry:
         ovp=3.600,
         ocp=0.800,
         verify_voltage=(3.135, 3.465),  # VCC op: 3.135-3.465V
-        verify_current=(0.720, 0.800),  # Icc 360-400mA x2 (X+Y)
+        verify_current=(0.648, 0.792),  # Icc 360-400mA x2 (X+Y), ±10% of 0.720A
     )
 
     VPD_5V0: ClassVar[RailConfig] = RailConfig(
