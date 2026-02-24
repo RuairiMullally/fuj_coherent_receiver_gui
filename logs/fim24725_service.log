@@ -1,19 +1,59 @@
-2026-02-12 18:51:12.129 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=<PSU2_IP>:20002
-2026-02-12 18:51:12.129 | fim24725.service | INFO | === Starting FIM24725 Startup Sequence ===
-2026-02-12 18:51:12.130 | fim24725.state | INFO | State: OFF -> STARTING
-2026-02-12 18:51:12.130 | fim24725.service | INFO | Step 1: Ensuring safe initial state
-2026-02-12 18:51:12.130 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
-2026-02-12 18:51:12.130 | fim24725.mcu.mock | INFO | MC/AGC -> AGC (HIGH)
-2026-02-12 18:51:12.130 | fim24725.rails | INFO | VCC_3V3: Disabling
-2026-02-12 18:51:12.161 | fim24725.rails | INFO | VPD_5V0: Disabling
-2026-02-12 18:51:12.192 | fim24725.rails | INFO | VOA_CTRL: Disabling
-2026-02-12 18:51:12.222 | fim24725.rails | INFO | GA_X: Disabling
-2026-02-12 18:51:12.223 | fim24725.service | ERROR | Startup failed: [Errno -2] Name or service not known
-2026-02-12 18:51:12.223 | fim24725.state | ERROR | FAULT from STARTING: Startup failed: [Errno -2] Name or service not known
-2026-02-12 18:51:12.223 | fim24725.service | WARNING | Emergency shutdown triggered
-2026-02-12 18:51:12.223 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
-2026-02-12 18:51:12.223 | fim24725.rails | INFO | VCC_3V3: Disabling
-2026-02-12 18:51:12.254 | fim24725.rails | INFO | VPD_5V0: Disabling
-2026-02-12 18:51:12.285 | fim24725.rails | INFO | VOA_CTRL: Disabling
-2026-02-12 18:51:12.316 | fim24725.rails | INFO | GA_X: Disabling
-2026-02-12 18:51:12.317 | fim24725.service | ERROR | Rail disable failed: [Errno -2] Name or service not known
+2026-02-16 16:37:44.181 | fim24725.service | INFO | FIM24725Service initialized: PSU1=192.168.1.10:18190, PSU2=192.168.1.11:18190
+2026-02-16 16:37:52.730 | fim24725.service | INFO | FIM24725Service closed
+2026-02-16 16:38:02.207 | fim24725.service | INFO | FIM24725Service initialized: PSU1=192.168.1.10:18190, PSU2=192.168.1.11:18190
+2026-02-16 16:38:09.453 | fim24725.service | INFO | FIM24725Service initialized: PSU1=192.168.1.10:18190, PSU2=192.168.1.11:18190
+2026-02-16 16:38:09.455 | fim24725.service | INFO | FIM24725Service closed
+2026-02-16 16:38:15.601 | fim24725.service | INFO | FIM24725Service initialized: PSU1=192.168.1.10:18190, PSU2=192.168.1.11:18190
+2026-02-16 16:38:38.645 | fim24725.service | INFO | FIM24725Service closed
+2026-02-16 16:38:38.660 | fim24725.service | INFO | FIM24725Service closed
+2026-02-16 16:55:56.383 | fim24725.service | INFO | FIM24725Service initialized: PSU1=192.168.1.10:18190, PSU2=192.168.1.11:18190
+2026-02-16 16:56:31.556 | fim24725.service | INFO | === Starting FIM24725 Startup Sequence ===
+2026-02-16 16:56:31.557 | fim24725.state | INFO | State: OFF -> STARTING
+2026-02-16 16:56:31.557 | fim24725.service | INFO | Step 1: Ensuring safe initial state
+2026-02-16 16:56:31.557 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
+2026-02-16 16:56:31.557 | fim24725.mcu.mock | INFO | MC/AGC -> AGC (HIGH)
+2026-02-16 16:56:31.558 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-02-16 16:56:31.605 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-02-16 16:56:31.637 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-02-16 16:56:31.668 | fim24725.rails | INFO | GA_X: Disabling
+2026-02-16 16:56:31.701 | fim24725.rails | INFO | GA_Y: Disabling
+2026-02-16 16:56:31.732 | fim24725.rails | INFO | OA_X: Disabling
+2026-02-16 16:56:31.763 | fim24725.rails | INFO | OA_Y: Disabling
+2026-02-16 16:56:31.794 | fim24725.service | INFO | Step 2: Programming protections and setpoints
+2026-02-16 16:56:31.795 | fim24725.rails | INFO | VCC_3V3: Programming OVP=3.600V, OCP=0.800A, Vset=3.300V, Iset=0.720A
+2026-02-16 16:56:31.981 | fim24725.rails | INFO | VPD_5V0: Programming OVP=5.500V, OCP=0.200A, Vset=5.000V, Iset=0.200A
+2026-02-16 16:56:32.166 | fim24725.rails | INFO | VOA_CTRL: Programming OVP=5.000V, OCP=0.100A, Vset=2.500V, Iset=0.080A
+2026-02-16 16:56:32.352 | fim24725.rails | INFO | GA_X: Programming OVP=3.600V, OCP=0.020A, Vset=0.000V, Iset=0.020A
+2026-02-16 16:56:32.547 | fim24725.rails | INFO | GA_Y: Programming OVP=3.600V, OCP=0.020A, Vset=0.000V, Iset=0.020A
+2026-02-16 16:56:32.731 | fim24725.rails | INFO | OA_X: Programming OVP=3.600V, OCP=0.020A, Vset=0.000V, Iset=0.020A
+2026-02-16 16:56:32.916 | fim24725.rails | INFO | OA_Y: Programming OVP=3.600V, OCP=0.020A, Vset=0.000V, Iset=0.020A
+2026-02-16 16:56:33.100 | fim24725.service | INFO | Step 3: Enabling VCC_3V3
+2026-02-16 16:56:33.100 | fim24725.rails | INFO | VCC_3V3: Enabling at 3.300V
+2026-02-16 16:56:35.665 | fim24725.service | ERROR | Startup failed: timed out
+2026-02-16 16:56:35.666 | fim24725.state | ERROR | FAULT from STARTING: Startup failed: timed out
+2026-02-16 16:56:35.666 | fim24725.service | WARNING | Emergency shutdown triggered
+2026-02-16 16:56:35.666 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
+2026-02-16 16:56:35.666 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-02-16 16:56:35.697 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-02-16 16:56:35.728 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-02-16 16:56:35.758 | fim24725.rails | INFO | GA_X: Disabling
+2026-02-16 16:56:35.789 | fim24725.rails | INFO | GA_Y: Disabling
+2026-02-16 16:56:35.820 | fim24725.rails | INFO | OA_X: Disabling
+2026-02-16 16:56:35.851 | fim24725.rails | INFO | OA_Y: Disabling
+2026-02-16 16:58:05.090 | fim24725.service | INFO | === Starting FIM24725 Shutdown Sequence ===
+2026-02-16 16:58:05.090 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
+2026-02-16 16:58:05.120 | fim24725.rails | DEBUG | VOA_CTRL -> 0.000V
+2026-02-16 16:58:05.151 | fim24725.rails | DEBUG | OA_X -> 0.000V
+2026-02-16 16:58:05.181 | fim24725.rails | DEBUG | OA_Y -> 0.000V
+2026-02-16 16:58:05.212 | fim24725.rails | DEBUG | GA_X -> 0.000V
+2026-02-16 16:58:05.243 | fim24725.rails | DEBUG | GA_Y -> 0.000V
+2026-02-16 16:58:05.243 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-02-16 16:58:05.273 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-02-16 16:58:05.304 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-02-16 16:58:05.335 | fim24725.rails | INFO | GA_X: Disabling
+2026-02-16 16:58:05.366 | fim24725.rails | INFO | GA_Y: Disabling
+2026-02-16 16:58:05.397 | fim24725.rails | INFO | OA_X: Disabling
+2026-02-16 16:58:05.429 | fim24725.rails | INFO | OA_Y: Disabling
+2026-02-16 16:58:05.460 | fim24725.state | INFO | State: FAULT -> OFF
+2026-02-16 16:58:05.460 | fim24725.service | INFO | === Shutdown Complete ===
+2026-02-16 16:58:05.460 | fim24725.service | INFO | FIM24725Service closed
