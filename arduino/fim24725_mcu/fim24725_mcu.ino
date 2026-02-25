@@ -53,6 +53,11 @@ static String inputBuffer = "";
 // ----- Timing -----
 static unsigned long lastTelemetry = 0;
 
+// ----- Connection state -----
+// Telemetry is suppressed until the host sends HELLO, preventing unsolicited
+// output from filling the serial buffer before the connection is established.
+static bool tele_enabled = false;
+
 
 // ============================================================
 // Helpers
@@ -118,6 +123,13 @@ static void processCommand(const String& cmd) {
             Serial.println("MODE:MGC");
         }
 
+    } else if (cmd == "HELLO") {
+        // Re-assert safe state, respond with current state, then enable telemetry
+        digitalWrite(PIN_SD,   HIGH);
+        digitalWrite(PIN_MODE, HIGH);
+        Serial.println("INIT:SD=1,MODE=AGC");
+        tele_enabled = true;
+
     } else {
         Serial.print("ERR:UNKNOWN:");
         Serial.println(cmd);
@@ -139,9 +151,7 @@ void setup() {
     // Safe initial state: module disabled (SD HIGH), AGC mode (MC/AGC HIGH)
     digitalWrite(PIN_SD,   HIGH);
     digitalWrite(PIN_MODE, HIGH);
-
-    // Confirm initial state to host
-    Serial.println("INIT:SD=1,MODE=AGC");
+    // Host confirms connection via HELLO command; no autonomous INIT: broadcast needed
 }
 
 void loop() {
@@ -159,9 +169,9 @@ void loop() {
         }
     }
 
-    // --- Periodic telemetry ---
+    // --- Periodic telemetry (only after HELLO handshake) ---
     unsigned long now = millis();
-    if (now - lastTelemetry >= TELE_INTERVAL_MS) {
+    if (tele_enabled && (now - lastTelemetry >= TELE_INTERVAL_MS)) {
         lastTelemetry = now;
         sendTelemetry();
     }

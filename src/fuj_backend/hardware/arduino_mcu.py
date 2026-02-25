@@ -51,7 +51,6 @@ class ArduinoMCU:
     """
 
     BAUD: int = 115200
-    BOOT_DELAY_S: float = 2.0   # Wait for Arduino reset-on-DTR before sending
     READ_TIMEOUT_S: float = 0.1  # Short timeout in reader thread (non-blocking feel)
 
     def __init__(
@@ -65,11 +64,12 @@ class ArduinoMCU:
         Args:
             port: Serial device path (default /dev/arduino via udev symlink).
             baud: Baud rate (must match Arduino firmware, default 115200).
-            timeout: Seconds to wait for command responses and INIT message.
+            timeout: Seconds to wait for each command response (including HELLO
+                     during connection).
 
         Raises:
-            MCUError: If the Arduino does not send INIT: within timeout seconds,
-                      indicating wrong firmware or hardware fault.
+            MCUError: If the Arduino does not respond to HELLO within timeout
+                      seconds, indicating wrong firmware or hardware fault.
             serial.SerialException: If the serial port cannot be opened.
         """
         self._logger = get_service_logger().getChild("mcu.arduino")
@@ -92,9 +92,6 @@ class ArduinoMCU:
         # Connected flag — set False by reader thread on serial fault
         self._connected = False
 
-        # INIT confirmation event — set when INIT: message is received
-        self._init_event = threading.Event()
-
         # Reader thread management
         self._stop_reader = threading.Event()
         self._serial: Optional[serial.Serial] = None
@@ -107,7 +104,7 @@ class ArduinoMCU:
     # ------------------------------------------------------------------
 
     def _connect(self) -> None:
-        """Open serial port, wait for Arduino boot, confirm INIT message."""
+        """Open serial port, reset Arduino via DTR, confirm firmware with HELLO."""
         self._logger.info(
             f"Connecting to Arduino on {self._port} at {self.BAUD} baud"
         )
@@ -118,14 +115,12 @@ class ArduinoMCU:
             timeout=self.READ_TIMEOUT_S,
         )
 
-        # Arduino resets when DTR is toggled on connect; give it time to boot
-        self._logger.debug(f"Waiting {self.BOOT_DELAY_S}s for Arduino reset")
-        time.sleep(self.BOOT_DELAY_S)
+        # Clear stale bytes buffered before this open (e.g. TELE: left over
+        # from the Arduino reset triggered when the previous session closed)
         self._serial.reset_input_buffer()
 
-        # Start background reader
+        # Start reader thread before the DTR pulse so it is ready to receive
         self._stop_reader.clear()
-        self._init_event.clear()
         self._reader_thread = threading.Thread(
             target=self._reader_loop,
             name="arduino-reader",
@@ -133,16 +128,46 @@ class ArduinoMCU:
         )
         self._reader_thread.start()
 
-        # Wait for INIT: message confirming firmware is running
-        if not self._init_event.wait(timeout=self._timeout):
+        # DTR reset: force HIGH first so the subsequent LOW is a guaranteed
+        # HIGH→LOW falling edge regardless of initial DTR state.
+        # HIGH→LOW on DTR couples through the 100nF cap → brief LOW on RESET → Arduino resets.
+        self._logger.debug("Resetting Arduino via DTR pulse")
+        self._serial.dtr = True   # ensure HIGH (no-op if already HIGH)
+        time.sleep(0.05)          # let cap settle to steady state
+        self._serial.dtr = False  # HIGH→LOW: cap couples edge → RESET LOW → Arduino resets
+
+        # Wait for optiboot bootloader to finish before sending HELLO.
+        # Arduino Uno R3 optiboot has a 1s upload window; 1.5s gives safe margin.
+        time.sleep(1.5)
+
+        # Drain any bytes that arrived during reset (null bytes, bootloader noise)
+        # before sending HELLO so _send_command gets the real response.
+        while True:
+            try:
+                self._response_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        # Active handshake: Pi requests state; Arduino responds with INIT: line.
+        # This is timing-safe — Pi controls when the handshake happens.
+        self._logger.debug("Sending HELLO to Arduino")
+        try:
+            response = self._send_command("HELLO")
+        except MCUError as e:
             self.close()
             raise MCUError(
-                f"Arduino on {self._port} did not send INIT within "
-                f"{self._timeout}s — check firmware and connection"
+                f"Arduino on {self._port} did not respond to HELLO — "
+                f"check firmware is flashed correctly: {e}"
+            ) from e
+
+        if not response.startswith("INIT:"):
+            self.close()
+            raise MCUError(
+                f"Unexpected HELLO response from {self._port}: {response!r}"
             )
 
         self._connected = True
-        self._logger.info("Arduino connected and initialised")
+        self._logger.info(f"Arduino connected: {response}")
 
     def _reader_loop(self) -> None:
         """Background thread: read lines from serial and route them."""
@@ -156,16 +181,13 @@ class ArduinoMCU:
                     continue  # Timeout, no data — keep looping
 
                 line = raw.decode("ascii", errors="replace").strip()
-                if not line:
+                if not line or '\x00' in line:
                     continue
 
                 self._logger.debug(f"RX: {line}")
 
                 if line.startswith("TELE:"):
                     self._parse_telemetry(line[5:])
-                elif line.startswith("INIT:"):
-                    self._logger.info(f"Arduino startup: {line}")
-                    self._init_event.set()
                 else:
                     self._response_queue.put(line)
 
