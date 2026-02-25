@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .arduino_mcu import ArduinoMCU
 from .psu_hal import (
     Channels,
     Channel,
@@ -12,6 +13,7 @@ from .psu_hal import (
 )
 
 __all__ = [
+    "ArduinoMCU",
     "Channels",
     "Channel",
     "DeviceId",

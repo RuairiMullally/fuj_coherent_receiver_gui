@@ -88,7 +88,7 @@ class FIM24725Service:
         # Automatic shutdown and cleanup
     """
 
-    SETTLING_TIME_MS: int = 100  # Default settling time in milliseconds
+    SETTLING_TIME_MS: int = 500  # Default settling time in milliseconds
 
     def __init__(
         self,
@@ -173,6 +173,40 @@ class FIM24725Service:
             self._rails.disable_all_rails()
         except Exception as e:
             self._logger.error(f"Rail disable failed: {e}")
+
+    # --- MCU error → fault helper ---
+
+    def _fault_on_mcu_error(self, context: str, e: MCUError) -> None:
+        """Transition to FAULT state on an MCU communication error.
+
+        Args:
+            context: Brief description of the operation that failed.
+            e: The MCUError that was caught.
+        """
+        self._logger.error(f"MCU error during {context}: {e}")
+        self._state.fault(
+            FaultInfo(
+                message=f"MCU error during {context}: {e}",
+                timestamp=time.time(),
+                recoverable=False,
+            )
+        )
+
+    def _fault_on_rail_error(self, context: str, e: VerificationError) -> None:
+        """Transition to FAULT state on a rail voltage verification failure.
+
+        Args:
+            context: Brief description of the operation that failed.
+            e: The VerificationError that was caught.
+        """
+        self._logger.error(f"Rail verification error during {context}: {e}")
+        self._state.fault(
+            FaultInfo(
+                message=f"Rail verification error during {context}: {e}",
+                timestamp=time.time(),
+                recoverable=False,
+            )
+        )
 
     # --- MCU verification helpers ---
 
@@ -339,7 +373,7 @@ class FIM24725Service:
             measurement = self._rails.measure_rail(RailName.VCC_3V3)
             raise VerificationError(
                 RailName.VCC_3V3,
-                "3.3V / 720-800mA",
+                "3.3V / 280-480mA",
                 f"{measurement.voltage:.3f}V / {measurement.current:.3f}A",
             )
 
@@ -347,7 +381,7 @@ class FIM24725Service:
         """Enable VPD rail and verify."""
         self._logger.info("Step 4: Enabling VPD_5V0")
         self._rails.enable_rail(RailName.VPD_5V0)
-        time.sleep(0.050)
+        time.sleep(0.500)  # 500ms settling for VPD_5V0
 
         if not self._rails.verify_rail(RailName.VPD_5V0):
             measurement = self._rails.measure_rail(RailName.VPD_5V0)
@@ -368,11 +402,39 @@ class FIM24725Service:
             ch.set_current_limit(config.nominal_current)
 
     def _enable_control_rails(self) -> None:
-        """Enable control rail outputs."""
+        """Enable control rail outputs; implicitly verify PSU2 is reachable."""
         self._logger.info("Step 6: Enabling control rails")
 
         for rail in RailRegistry.CONTROL_RAILS:
             self._rails.enable_rail(rail)
+
+        time.sleep(0.300)  # settling
+
+        # Confirm PSU1 control is responsive and VOA_CTRL is at nominal.
+        # socket.timeout propagates to startup's except block if PSU1 is unreachable.
+        self._logger.info("Step 6a: Confirming PSU1 control reachable")
+        voa_meas = self._rails.measure_rail(RailName.VOA_CTRL)
+        voa_nominal = RailRegistry.get(RailName.VOA_CTRL).nominal_voltage
+        if abs(voa_meas.voltage - voa_nominal) > 0.1:
+            raise VerificationError(
+                RailName.VOA_CTRL,
+                f"{voa_nominal:.3f}V ±0.100V",
+                f"{voa_meas.voltage:.3f}V",
+            )
+        self._logger.info(f"PSU1 control confirmed reachable — VOA_CTRL={voa_meas.voltage:.3f}V")
+
+        # Confirm PSU2 is responsive and GA_X is at nominal (0V).
+        # socket.timeout propagates to startup's except block if PSU2 is unreachable.
+        self._logger.info("Step 6b: Confirming PSU2 reachable")
+        ga_meas = self._rails.measure_rail(RailName.GA_X)
+        ga_nominal = RailRegistry.get(RailName.GA_X).nominal_voltage
+        if abs(ga_meas.voltage - ga_nominal) > 0.1:
+            raise VerificationError(
+                RailName.GA_X,
+                f"{ga_nominal:.3f}V ±0.100V",
+                f"{ga_meas.voltage:.3f}V",
+            )
+        self._logger.info(f"PSU2 confirmed reachable — GA_X={ga_meas.voltage:.3f}V")
 
     def _enable_module_output(self, mode: OperatingMode) -> None:
         """Enable module output (SD = ENABLE)."""
@@ -421,7 +483,7 @@ class FIM24725Service:
             # Step 1: SD = DISABLE
             self._logger.info("Step 1: Disabling module output (SD=HIGH)")
             try:
-                self._mcu.set_shutdown(disable=True)
+                self._set_sd_verified(True)
             except Exception as e:
                 self._logger.error(f"SD disable failed: {e}")
 
@@ -431,9 +493,8 @@ class FIM24725Service:
                 self._rails.set_voa(0.0)
                 self._rails.set_oa_x(0.0)
                 self._rails.set_oa_y(0.0)
-                # Force GA to 0 regardless of mode
-                self._rails.set_ga_x(0.0, OperatingMode.MGC)
-                self._rails.set_ga_y(0.0, OperatingMode.MGC)
+                self._rails.set_ga_x(0.0)
+                self._rails.set_ga_y(0.0)
             except Exception as e:
                 self._logger.error(f"Control reset failed: {e}")
 
@@ -483,7 +544,11 @@ class FIM24725Service:
             StateError: If system not ready
         """
         self._state.require_state(SystemState.READY)
-        self._rails.set_voa(volts)
+        try:
+            self._rails.set_voa(volts)
+        except VerificationError as e:
+            self._fault_on_rail_error("set_voa", e)
+            raise
 
     @synchronized
     def set_oa_x(self, volts: float) -> None:
@@ -500,7 +565,11 @@ class FIM24725Service:
             StateError: If system not ready
         """
         self._state.require_state(SystemState.READY)
-        self._rails.set_oa_x(volts)
+        try:
+            self._rails.set_oa_x(volts)
+        except VerificationError as e:
+            self._fault_on_rail_error("set_oa_x", e)
+            raise
 
     @synchronized
     def set_oa_y(self, volts: float) -> None:
@@ -517,47 +586,61 @@ class FIM24725Service:
             StateError: If system not ready
         """
         self._state.require_state(SystemState.READY)
-        self._rails.set_oa_y(volts)
+        try:
+            self._rails.set_oa_y(volts)
+        except VerificationError as e:
+            self._fault_on_rail_error("set_oa_y", e)
+            raise
 
     @synchronized
     def set_ga_x(self, volts: float) -> None:
         """
-        Set Gain Adjust X voltage (MGC mode only).
+        Set Gain Adjust X voltage.
 
         Controls internal gain for X channel. Affects noise profile
         and output swing. Mainly useful for lab characterization.
 
+        Can be called in either AGC or MGC mode. In AGC mode the FIM24725
+        hardware ignores the GA pin, so setting a value pre-stages it — the
+        voltage takes effect immediately when the system switches to MGC.
+
         Args:
             volts: Target voltage, clamped to 0-3.3V
-
-        Note:
-            Ignored if system is in AGC mode (logs warning).
 
         Raises:
             StateError: If system not ready
         """
         self._state.require_state(SystemState.READY)
-        self._rails.set_ga_x(volts, self._state.mode)
+        try:
+            self._rails.set_ga_x(volts)
+        except VerificationError as e:
+            self._fault_on_rail_error("set_ga_x", e)
+            raise
 
     @synchronized
     def set_ga_y(self, volts: float) -> None:
         """
-        Set Gain Adjust Y voltage (MGC mode only).
+        Set Gain Adjust Y voltage.
 
         Controls internal gain for Y channel. Affects noise profile
         and output swing. Mainly useful for lab characterization.
 
+        Can be called in either AGC or MGC mode. In AGC mode the FIM24725
+        hardware ignores the GA pin, so setting a value pre-stages it — the
+        voltage takes effect immediately when the system switches to MGC.
+
         Args:
             volts: Target voltage, clamped to 0-3.3V
-
-        Note:
-            Ignored if system is in AGC mode (logs warning).
 
         Raises:
             StateError: If system not ready
         """
         self._state.require_state(SystemState.READY)
-        self._rails.set_ga_y(volts, self._state.mode)
+        try:
+            self._rails.set_ga_y(volts)
+        except VerificationError as e:
+            self._fault_on_rail_error("set_ga_y", e)
+            raise
 
     # --- Mode Control ---
 
@@ -566,7 +649,11 @@ class FIM24725Service:
         """
         Switch operating mode between AGC and MGC.
 
-        In AGC mode, GA channels are ignored (internal automatic control).
+        In AGC mode, GA channels are ignored by the FIM24725 hardware
+        (internal automatic gain control active). GA PSU outputs remain
+        at their current voltage, enabling pre-staging: a GA value set
+        while in AGC takes effect immediately when the system switches to MGC.
+
         In MGC mode, GA channels are active for manual gain control.
 
         Args:
@@ -574,15 +661,15 @@ class FIM24725Service:
 
         Raises:
             StateError: If system not ready or during startup
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
         """
         self._state.require_state(SystemState.READY)
-        self._set_mode_verified(mode)
+        try:
+            self._set_mode_verified(mode)
+        except MCUError as e:
+            self._fault_on_mcu_error("set_mode", e)
+            raise
         self._state.set_mode(mode)
-
-        # In AGC mode, hold GA at safe value
-        if mode == OperatingMode.AGC:
-            self._rails.set_ga_x(0.0, OperatingMode.MGC)
-            self._rails.set_ga_y(0.0, OperatingMode.MGC)
 
     # --- Monitoring ---
 
@@ -628,8 +715,15 @@ class FIM24725Service:
 
         Returns:
             PeakIndicators with all 4 channel readings
+
+        Raises:
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
         """
-        return self._mcu.read_peak_indicators()
+        try:
+            return self._mcu.read_peak_indicators()
+        except MCUError as e:
+            self._fault_on_mcu_error("read_peak_indicators", e)
+            raise
 
     @synchronized
     def read_mpd(self) -> float:
@@ -641,8 +735,15 @@ class FIM24725Service:
 
         Returns:
             MPD reading value
+
+        Raises:
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
         """
-        return self._mcu.read_mpd()
+        try:
+            return self._mcu.read_mpd()
+        except MCUError as e:
+            self._fault_on_mcu_error("read_mpd", e)
+            raise
 
     # --- Advanced Operations ---
 
@@ -686,19 +787,23 @@ class FIM24725Service:
 
         # Use internal methods to avoid re-acquiring lock
         set_ga = (
-            lambda v: self._rails.set_ga_x(v, self._state.mode)
+            lambda v: self._rails.set_ga_x(v)
             if channel.upper() == "X"
-            else self._rails.set_ga_y(v, self._state.mode)
+            else self._rails.set_ga_y(v)
         )
 
-        while (step_signed > 0 and current <= end) or (
-            step_signed < 0 and current >= end
-        ):
-            set_ga(current)
-            time.sleep(dwell_ms / 1000.0)
-            pi = self._mcu.read_peak_indicators()
-            results.append((current, pi))
-            current += step_signed
+        try:
+            while (step_signed > 0 and current <= end) or (
+                step_signed < 0 and current >= end
+            ):
+                set_ga(current)
+                time.sleep(dwell_ms / 1000.0)
+                pi = self._mcu.read_peak_indicators()
+                results.append((current, pi))
+                current += step_signed
+        except VerificationError as e:
+            self._fault_on_rail_error("sweep_ga", e)
+            raise
 
         return results
 
@@ -726,7 +831,7 @@ class FIM24725Service:
                 self._state.transition_to(SystemState.SHUTTING_DOWN)
 
             try:
-                self._mcu.set_shutdown(disable=True)
+                self._set_sd_verified(True)
             except Exception as e:
                 self._logger.error(f"SD disable failed: {e}")
 
@@ -734,8 +839,8 @@ class FIM24725Service:
                 self._rails.set_voa(0.0)
                 self._rails.set_oa_x(0.0)
                 self._rails.set_oa_y(0.0)
-                self._rails.set_ga_x(0.0, OperatingMode.MGC)
-                self._rails.set_ga_y(0.0, OperatingMode.MGC)
+                self._rails.set_ga_x(0.0)
+                self._rails.set_ga_y(0.0)
             except Exception as e:
                 self._logger.error(f"Control reset failed: {e}")
 

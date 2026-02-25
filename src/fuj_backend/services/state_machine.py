@@ -114,13 +114,7 @@ class StateMachine:
 
         Args:
             mode: Target operating mode
-
-        Raises:
-            StateError: If changing mode during startup
         """
-        if self._state == SystemState.STARTING:
-            raise StateError("Cannot change mode during startup", self._state)
-
         old_mode = self._mode
         self._mode = mode
         if old_mode != mode:
