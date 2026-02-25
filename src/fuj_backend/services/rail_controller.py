@@ -194,7 +194,7 @@ class RailController:
 
     # --- Voltage Write Helpers ---
 
-    _SETTLE_S: float = 0.100  # Output settling time after a voltage write (seconds)
+    _SETTLE_S: float = 0.400  # Output settling time after a voltage write (seconds)
 
     def _set_voltage_verified(self, rail: RailName, volts: float, tol: float = 0.1) -> None:
         """Set channel voltage and verify via VOUT? readback.

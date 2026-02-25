@@ -373,7 +373,7 @@ class FIM24725Service:
             measurement = self._rails.measure_rail(RailName.VCC_3V3)
             raise VerificationError(
                 RailName.VCC_3V3,
-                "3.3V / 720-800mA",
+                "3.3V / 280-480mA",
                 f"{measurement.voltage:.3f}V / {measurement.current:.3f}A",
             )
 
@@ -649,7 +649,11 @@ class FIM24725Service:
         """
         Switch operating mode between AGC and MGC.
 
-        In AGC mode, GA channels are ignored (internal automatic control).
+        In AGC mode, GA channels are ignored by the FIM24725 hardware
+        (internal automatic gain control active). GA PSU outputs remain
+        at their current voltage, enabling pre-staging: a GA value set
+        while in AGC takes effect immediately when the system switches to MGC.
+
         In MGC mode, GA channels are active for manual gain control.
 
         Args:
@@ -666,15 +670,6 @@ class FIM24725Service:
             self._fault_on_mcu_error("set_mode", e)
             raise
         self._state.set_mode(mode)
-
-        # In AGC mode, hold GA at safe value
-        if mode == OperatingMode.AGC:
-            try:
-                self._rails.set_ga_x(0.0)
-                self._rails.set_ga_y(0.0)
-            except VerificationError as e:
-                self._fault_on_rail_error("set_mode GA reset", e)
-                raise
 
     # --- Monitoring ---
 

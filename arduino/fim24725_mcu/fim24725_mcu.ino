@@ -30,8 +30,13 @@
  *     INIT:SD=1,MODE=AGC   -- emitted once on startup
  *     TELE:PI_XI=x.xxx,PI_XQ=x.xxx,PI_YI=x.xxx,PI_YQ=x.xxx,MPD=x.xxx
  *
- * ADC: default AREF = VCC = 5V.  voltage = (analogRead(pin) / 1024.0) * 5.0
- * PI and MPD signals are 0-2V; they map to 0-40.9% of ADC range (~4.9 mV/count).
+ * ADC: AREF pin connected to Arduino 3.3V pin (analogReference(EXTERNAL)).
+ * voltage = (analogRead(pin) / 1024.0) * 3.3
+ * FIM24725 PI/MPD signals are 0-2V; they map to 0-61.6% of ADC range (~3.2 mV/count).
+ *
+ * NOTE: D2 and D3 are 5V Arduino outputs driving FIM24725 pins rated for 2-3.3V HIGH.
+ * A voltage divider (e.g. 33k + 22k) on each output is recommended to keep logic
+ * HIGH within the FIM24725 operating specification.
  */
 
 // ----- Pin definitions -----
@@ -64,7 +69,7 @@ static bool tele_enabled = false;
 // ============================================================
 
 static float adcToVolts(int raw) {
-    return (raw / 1024.0f) * 5.0f;
+    return (raw / 1024.0f) * 3.3f;
 }
 
 static void sendTelemetry() {
@@ -143,6 +148,9 @@ static void processCommand(const String& cmd) {
 
 void setup() {
     Serial.begin(115200);
+
+    // Use AREF pin as voltage reference (connect AREF pin to Arduino 3.3V pin)
+    analogReference(EXTERNAL);
 
     // Set outputs before enabling — avoids glitch on FIM24725 control pins
     pinMode(PIN_SD,   OUTPUT);

@@ -204,10 +204,10 @@ Execute the full startup sequence:
 
 1. Verify safe initial state (SD=DISABLE, all off)
 2. Program OVP/OCP protections
-3. Enable VCC_3V3, verify 3.3V / 360-400mA
+3. Enable VCC_3V3, verify 3.3V / 280-480mA (datasheet Icc 360-400mA ±20%)
 4. Enable VPD_5V0, verify 5.0V
 5. Set initial controls (GA/OA=0V, VOA=2.5V)
-6. Enable control rail outputs; confirm PSU2 responsive (STATUS?+VOUT? query)
+6. Enable control rail outputs; confirm PSU1 (VOA_CTRL) and PSU2 (GA_X) responsive via VOUT? query
 7. Settling delay (500ms)
 8. Enable module output (SD=ENABLE)
 9. Validate peak indicators
@@ -325,10 +325,10 @@ service.set_ga_y(1.0)
 
 Switch operating mode between AGC and MGC.
 
-- **AGC:** FIM24725 hardware ignores GA pins (automatic internal control); GA PSU outputs remain active so values can be pre-staged
-- **MGC:** GA pins active for manual gain control
+- **AGC:** FIM24725 hardware ignores GA pins (automatic internal control); GA PSU outputs remain at their current voltage, preserving any pre-staged value
+- **MGC:** GA pins active for manual gain control; any value pre-staged during AGC takes effect immediately
 
-When switching to AGC, GA values are automatically reset to 0V.
+GA values are **not reset** on mode transitions. This allows pre-staging a GA value in AGC and having it become active the instant the system switches to MGC, with no intervening write required.
 
 ```python
 service.set_mode(OperatingMode.MGC)
@@ -423,9 +423,9 @@ print(RailRegistry.OA_RAILS)       # [OA_X, OA_Y]
 
 | Rail | PSU | Ch | Nominal | Max | OVP | OCP |
 |------|-----|----|---------| ----|-----|-----|
-| VCC_3V3 | PSU1 | 1 | 3.300V | 3.300V | 3.600V | 0.800A |
-| VPD_5V0 | PSU1 | 2 | 5.000V | 5.000V | 5.500V | 0.200A |
-| VOA_CTRL | PSU1 | 3 | 0.0V | 4.800V | 5.000V | 0.100A |
+| VCC_3V3 | PSU1 | 1 | 3.300V | 3.300V | 3.600V | 0.700A |
+| VPD_5V0 | PSU1 | 2 | 5.000V | 5.000V | 5.500V | 0.150A |
+| VOA_CTRL | PSU1 | 3 | 2.500V | 4.800V | 5.000V | 0.100A |
 | GA_X | PSU2 | 1 | 0.0V | 3.300V | 3.600V | 0.020A |
 | GA_Y | PSU2 | 2 | 0.0V | 3.300V | 3.600V | 0.020A |
 | OA_X | PSU2 | 3 | 0.0V | 3.300V | 3.600V | 0.020A |

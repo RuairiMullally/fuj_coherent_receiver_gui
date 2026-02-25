@@ -183,15 +183,12 @@ with ArduinoMCU("/dev/arduino") as mcu:
         for v, pi in results_y:
             print(f"    GA_Y={v:.2f}V  PI: XI={pi.pi_xi:.3f} XQ={pi.pi_xq:.3f} YI={pi.pi_yi:.3f} YQ={pi.pi_yq:.3f}")
 
-        # Return GA to safe value before switching back to AGC
-        step("set_ga_x(0.0) / set_ga_y(0.0) — zero GA before switching to AGC")
-        service.set_ga_x(0.0)
-        service.set_ga_y(0.0)
-
         # ------------------------------------------------------------------
         # MODE SWITCH BACK TO AGC
         # ------------------------------------------------------------------
-        step("set_mode(AGC) — return to automatic gain control; GA zeroed by service")
+        # GA retains its last value (end of sweep); FIM24725 ignores GA in AGC.
+        # Pre-staged for next MGC session — no zeroing needed.
+        step("set_mode(AGC) — return to automatic gain control; GA value retained")
         service.set_mode(OperatingMode.AGC)
         show("mode", service.mode)
 
