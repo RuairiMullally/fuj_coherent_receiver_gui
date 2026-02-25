@@ -32,9 +32,9 @@ try:
     service.set_oa_x(1.65)     # Output amplitude X
     service.set_oa_y(1.65)     # Output amplitude Y
 
-    # Switch to manual gain control
+    # Pre-stage GA values before switching to MGC
+    service.set_ga_x(1.0)      # Takes effect immediately on switch to MGC
     service.set_mode(OperatingMode.MGC)
-    service.set_ga_x(1.0)      # Gain adjust X (MGC only)
 
     # Read status
     snapshot = service.get_snapshot()
@@ -106,8 +106,8 @@ class SystemState(str, Enum):
 
 ```python
 class OperatingMode(str, Enum):
-    AGC = "AGC"    # Automatic gain control (GA ignored)
-    MGC = "MGC"    # Manual gain control (GA active)
+    AGC = "AGC"    # Automatic gain control (FIM24725 ignores GA pins)
+    MGC = "MGC"    # Manual gain control (GA pins active)
 ```
 
 ### `RailName`
@@ -206,9 +206,9 @@ Execute the full startup sequence:
 2. Program OVP/OCP protections
 3. Enable VCC_3V3, verify 3.3V / 360-400mA
 4. Enable VPD_5V0, verify 5.0V
-5. Set initial controls (GA/OA=0V, VOA=0.5V)
-6. Enable control rail outputs
-7. Settling delay (100ms)
+5. Set initial controls (GA/OA=0V, VOA=2.5V)
+6. Enable control rail outputs; confirm PSU2 responsive (STATUS?+VOUT? query)
+7. Settling delay (500ms)
 8. Enable module output (SD=ENABLE)
 9. Validate peak indicators
 
@@ -289,22 +289,29 @@ service.set_oa_y(1.65)
 
 #### `set_ga_x(volts: float) -> None`
 
-Set Gain Adjust X voltage (MGC mode only).
+Set Gain Adjust X voltage.
 
 - **Range:** 0-3.3V (clamped)
 - **Effect:** Controls internal gain, affects noise and output swing
-- **Note:** Ignored in AGC mode (logs warning)
+- **AGC mode:** FIM24725 hardware ignores the GA pin, so calling this in AGC
+  pre-stages the value — it becomes active the moment the system switches to MGC
 
 ```python
+# Pre-stage before switching mode
+service.set_ga_x(1.0)
+service.set_mode(OperatingMode.MGC)
+
+# Or set directly in MGC
 service.set_mode(OperatingMode.MGC)
 service.set_ga_x(1.0)
 ```
 
 #### `set_ga_y(volts: float) -> None`
 
-Set Gain Adjust Y voltage (MGC mode only).
+Set Gain Adjust Y voltage.
 
 - **Range:** 0-3.3V (clamped)
+- **AGC mode:** Pre-stages value; active on switch to MGC
 
 ```python
 service.set_ga_y(1.0)
@@ -318,10 +325,10 @@ service.set_ga_y(1.0)
 
 Switch operating mode between AGC and MGC.
 
-- **AGC:** GA channels ignored (automatic internal control)
-- **MGC:** GA channels active for manual gain control
+- **AGC:** FIM24725 hardware ignores GA pins (automatic internal control); GA PSU outputs remain active so values can be pre-staged
+- **MGC:** GA pins active for manual gain control
 
-When switching to AGC, GA values are automatically set to 0V.
+When switching to AGC, GA values are automatically reset to 0V.
 
 ```python
 service.set_mode(OperatingMode.MGC)

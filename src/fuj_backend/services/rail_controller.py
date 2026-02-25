@@ -6,13 +6,14 @@ hiding PSU/channel details and enforcing voltage/current bounds.
 
 from __future__ import annotations
 
+import time
 from typing import Optional
 
 from ..hardware.psu_hal import Channel, MP71050x
 
-from .exceptions import BoundsError
+from .exceptions import BoundsError, VerificationError
 from .logging import get_service_logger
-from .models import OperatingMode, RailMeasurement, RailName, RailState
+from .models import RailMeasurement, RailName, RailState
 from .rail_config import RailRegistry
 
 
@@ -95,9 +96,13 @@ class RailController:
     # --- Protection Programming ---
 
     def program_protections(self, rail: RailName) -> None:
-        """Program OVP/OCP for a rail.
+        """Program OVP/OCP for a rail and verify setpoints were accepted.
 
         Must be called before enabling output per safety requirements.
+
+        Raises:
+            VerificationError: If the PSU reports a setpoint that differs from
+                what was written, or if a protection is not enabled.
         """
         config = RailRegistry.get(rail)
         ch = self._get_channel(rail)
@@ -110,6 +115,41 @@ class RailController:
         ch.set_ocp(config.ocp, enabled=True)
         ch.set_voltage(config.nominal_voltage)
         ch.set_current_limit(config.nominal_current)
+
+        # Verify all setpoints were accepted by the PSU
+        ovp_val, ovp_en = ch.get_ovp()
+        if abs(ovp_val - config.ovp) > 0.01 or not ovp_en:
+            raise VerificationError(
+                rail,
+                f"OVP={config.ovp:.3f}V en=True",
+                f"OVP={ovp_val:.3f}V en={ovp_en}",
+            )
+
+        ocp_val, ocp_en = ch.get_ocp()
+        if abs(ocp_val - config.ocp) > 0.01 or not ocp_en:
+            raise VerificationError(
+                rail,
+                f"OCP={config.ocp:.3f}A en=True",
+                f"OCP={ocp_val:.3f}A en={ocp_en}",
+            )
+
+        vset = ch.get_voltage_setpoint()
+        if abs(vset - config.nominal_voltage) > 0.01:
+            raise VerificationError(
+                rail,
+                f"VSET={config.nominal_voltage:.3f}V",
+                f"VSET={vset:.3f}V",
+            )
+
+        iset = ch.get_current_setpoint()
+        if abs(iset - config.nominal_current) > 0.001:
+            raise VerificationError(
+                rail,
+                f"ISET={config.nominal_current:.3f}A",
+                f"ISET={iset:.3f}A",
+            )
+
+        self._logger.debug(f"{rail.value}: Protection setpoints verified OK")
 
     def program_all_protections(self) -> None:
         """Program protections for all rails."""
@@ -152,6 +192,37 @@ class RailController:
         for rail in RailName:
             self.disable_rail(rail)
 
+    # --- Voltage Write Helpers ---
+
+    _SETTLE_S: float = 0.100  # Output settling time after a voltage write (seconds)
+
+    def _set_voltage_verified(self, rail: RailName, volts: float, tol: float = 0.1) -> None:
+        """Set channel voltage and verify via VOUT? readback.
+
+        Waits _SETTLE_S after the write before querying, allowing the PSU
+        output to slew to the new setpoint before the readback.
+
+        socket.timeout propagates if the PSU is unreachable.
+        Raises VerificationError if measured voltage deviates beyond tolerance.
+        """
+        ch = self._get_channel(rail)
+        ch.set_voltage(volts)
+        time.sleep(self._SETTLE_S)  # allow PSU output to settle
+        measured = ch.measure_voltage()
+        if abs(measured - volts) > tol:
+            self._logger.error(
+                f"{rail.value}: Voltage write verify failed — "
+                f"set {volts:.3f}V, measured {measured:.3f}V (tol ±{tol:.3f}V)"
+            )
+            raise VerificationError(
+                rail,
+                f"{volts:.3f}V ±{tol:.3f}V",
+                f"{measured:.3f}V",
+            )
+        self._logger.debug(
+            f"{rail.value}: Write verified {measured:.3f}V ≈ {volts:.3f}V"
+        )
+
     # --- Voltage Control (Named Rail API) ---
 
     def set_voa(self, volts: float) -> None:
@@ -161,8 +232,7 @@ class RailController:
             volts: Target voltage, clamped to 0-4.8V
         """
         volts = self._clamp_and_validate(RailName.VOA_CTRL, volts)
-        ch = self._get_channel(RailName.VOA_CTRL)
-        ch.set_voltage(volts)
+        self._set_voltage_verified(RailName.VOA_CTRL, volts)
         self._logger.debug(f"VOA_CTRL -> {volts:.3f}V")
 
     def set_oa_x(self, volts: float) -> None:
@@ -172,8 +242,7 @@ class RailController:
             volts: Target voltage, clamped to 0-3.3V (0-VCC)
         """
         volts = self._clamp_and_validate(RailName.OA_X, volts)
-        ch = self._get_channel(RailName.OA_X)
-        ch.set_voltage(volts)
+        self._set_voltage_verified(RailName.OA_X, volts)
         self._logger.debug(f"OA_X -> {volts:.3f}V")
 
     def set_oa_y(self, volts: float) -> None:
@@ -183,44 +252,27 @@ class RailController:
             volts: Target voltage, clamped to 0-3.3V (0-VCC)
         """
         volts = self._clamp_and_validate(RailName.OA_Y, volts)
-        ch = self._get_channel(RailName.OA_Y)
-        ch.set_voltage(volts)
+        self._set_voltage_verified(RailName.OA_Y, volts)
         self._logger.debug(f"OA_Y -> {volts:.3f}V")
 
-    def set_ga_x(self, volts: float, mode: OperatingMode) -> None:
+    def set_ga_x(self, volts: float) -> None:
         """Set Gain Adjust X.
 
         Args:
             volts: Target voltage, clamped to 0-3.3V (0-VCC)
-            mode: Current operating mode (GA only effective in MGC)
-
-        Note:
-            Logs warning and returns without action if mode is AGC.
         """
-        if mode != OperatingMode.MGC:
-            self._logger.warning("GA_X ignored in AGC mode")
-            return
         volts = self._clamp_and_validate(RailName.GA_X, volts)
-        ch = self._get_channel(RailName.GA_X)
-        ch.set_voltage(volts)
+        self._set_voltage_verified(RailName.GA_X, volts)
         self._logger.debug(f"GA_X -> {volts:.3f}V")
 
-    def set_ga_y(self, volts: float, mode: OperatingMode) -> None:
+    def set_ga_y(self, volts: float) -> None:
         """Set Gain Adjust Y.
 
         Args:
             volts: Target voltage, clamped to 0-3.3V (0-VCC)
-            mode: Current operating mode (GA only effective in MGC)
-
-        Note:
-            Logs warning and returns without action if mode is AGC.
         """
-        if mode != OperatingMode.MGC:
-            self._logger.warning("GA_Y ignored in AGC mode")
-            return
         volts = self._clamp_and_validate(RailName.GA_Y, volts)
-        ch = self._get_channel(RailName.GA_Y)
-        ch.set_voltage(volts)
+        self._set_voltage_verified(RailName.GA_Y, volts)
         self._logger.debug(f"GA_Y -> {volts:.3f}V")
 
     # --- Measurement ---
