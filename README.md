@@ -1,177 +1,148 @@
 # FUJ Coherent Receiver GUI
 
-A web-based control system for coherent receiver hardware, combining FastAPI backend with a Dash-based interactive frontend in a single application.
+Web-based control panel for the FIM24725 coherent optical receiver module.
+Controls two programmable PSUs (7 power rails), an Arduino MCU, and displays
+live PI / MPD telemetry.
 
 ---
 
-## Project Status
+## Architecture
 
-This project has been initialized with the development infrastructure. The source code is ready to be built with a clear architectural vision.
+Two processes, one port each:
 
-**Verified Tech Stack:**
-- FastAPI + Dash integration using WSGIMiddleware ✓
-- Single-process, single-port application ✓
-- Docker and dev container configuration ✓
+```
+Browser → http://127.0.0.1:8050
+              ↓
+         Dash UI (fuj_gui)
+         polling REST API via httpx
+              ↓ HTTP
+         FastAPI backend (fuj_backend)  → http://127.0.0.1:8000
+              ↓
+         FIM24725Service  (threading.RLock, state machine)
+              ↓
+         PSU HAL (UDP)  +  Arduino MCU (serial)
+              ↓
+         Lab hardware
+```
+
+| Component | Description |
+|---|---|
+| `fuj_gui` | Dash frontend — DARKLY dark theme, 500ms polling |
+| `fuj_backend` | FastAPI REST API — rate-limited, exception-mapped |
+| `services/` | `FIM24725Service` — sequencing, state machine, thread safety |
+| `hardware/` | PSU HAL (UDP) + Arduino MCU (serial / mock) |
 
 ---
 
-## Quick Start
+## Quick start
 
-### Development Setup
-
-The project includes a VS Code dev container with all dependencies pre-configured:
-
-1. Open in VS Code
-2. Click "Reopen in Container" when prompted
-3. Wait for the container to build
-
-### Manual Setup
+### Mock hardware (no physical devices)
 
 ```bash
-# Install dependencies
 pip install -e .
 
-# Run the application (once implemented)
-python -m fuj_backend.main
+# Terminal 1 — API
+FUJ_MCU_MODE=mock FUJ_PSU1_LOCAL_IP="" FUJ_PSU2_LOCAL_IP="" \
+  uvicorn fuj_backend.api.app:create_app --factory --port 8000
+
+# Terminal 2 — UI
+fuj-gui
 ```
 
-**Planned Access Points:**
-- **Web Dashboard:** http://localhost:8000/dashboard/
-- **API Documentation:** http://localhost:8000/docs
-- **REST API:** http://localhost:8000/api/*
+Open `http://127.0.0.1:8050`.
 
----
-
-## Project Goals
-
-- Provide a **robust, safe control interface** for coherent receiver hardware
-- **Web-based GUI** accessible from any browser (local or remote)
-- Ensure **all control logic and validation** lives in a single backend
-- **Single unified application** - no separate frontend/backend processes
-- Be **fully reproducible** using Docker on Linux systems
-
----
-
-## Planned Architecture
-
-This application will use a **unified architecture** where the FastAPI backend and Dash frontend run in a single process:
-
-```
-┌─────────────────────────────────────────────┐
-│  Browser → http://localhost:8000            │
-│                                             │
-│  /dashboard/  → Dash Web UI (WSGI)         │
-│  /api/*       → FastAPI REST API (ASGI)    │
-│  /docs        → Interactive API docs        │
-└─────────────────────────────────────────────┘
-                      ↓
-        ┌─────────────────────────┐
-        │   Safety Manager        │
-        │   - Validation          │
-        │   - Rate Limiting       │
-        └─────────────────────────┘
-                      ↓
-        ┌─────────────────────────┐
-        │   Hardware Layer        │
-        │   - Simulator (dev)     │
-        │   - Real HW (prod)      │
-        └─────────────────────────┘
-```
-
-**Key Integration:** FastAPI (ASGI) hosts Dash (WSGI) using `WSGIMiddleware`, allowing both to run in one process on one port.
-
----
-
-## Project Structure
-
-```
-src/
-├── fuj_backend/              # FastAPI backend (to be implemented)
-│   ├── api/                  # REST API endpoints
-│   ├── hardware/             # Hardware drivers & safety
-│   ├── models/               # Pydantic models
-│   ├── config.py             # Configuration
-│   └── main.py              # Application entry point
-│
-└── fuj_gui/                  # Dash frontend (to be implemented)
-    ├── app.py                # Dash app factory
-    ├── layout.py             # UI components
-    ├── callbacks.py          # Interactive callbacks
-    └── api_client.py         # Backend API client
-```
-
----
-
-## Running with Docker
+### Real hardware (Raspberry Pi)
 
 ```bash
-# Using docker-compose
-docker-compose up -d
+# Terminal 1 — API
+FUJ_MCU_MODE=real \
+FUJ_PSU1_IP=10.10.10.137 \
+FUJ_PSU2_IP=10.10.20.137 \
+  uvicorn fuj_backend.api.app:create_app --factory --host 0.0.0.0 --port 8000
 
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
+# Terminal 2 — UI
+FUJ_GUI_API_BASE_URL=http://localhost:8000 fuj-gui
 ```
 
 ---
 
 ## Configuration
 
-Set via environment variables or `.env` file:
+### API (`FUJ_` prefix)
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `DEBUG` | `false` | Enable debug mode and auto-reload |
-| `HARDWARE_MODE` | `simulator` | Use `simulator` or `real` hardware |
-| `HOST` | `0.0.0.0` | Server bind address |
-| `PORT` | `8000` | Server port |
-| `NUM_CHANNELS` | `8` | Number of hardware channels |
+|---|---|---|
+| `FUJ_PSU1_IP` | `10.10.10.137` | PSU1 IP (VCC, VPD, VOA) |
+| `FUJ_PSU2_IP` | `10.10.20.137` | PSU2 IP (GA, OA) |
+| `FUJ_PSU1_LOCAL_IP` | `10.10.10.50` | Local NIC for PSU1 (empty = default route) |
+| `FUJ_PSU2_LOCAL_IP` | `10.10.20.50` | Local NIC for PSU2 |
+| `FUJ_MCU_MODE` | `mock` | `mock` or `real` |
+| `FUJ_MCU_PORT` | `/dev/arduino` | Serial port (real mode only) |
+| `FUJ_LOG_LEVEL` | `INFO` | Root log level |
 
-**Example `.env` file:**
-```bash
-DEBUG=true
-HARDWARE_MODE=simulator
-PORT=8000
+### UI (`FUJ_GUI_` prefix)
+
+| Variable | Default | Description |
+|---|---|---|
+| `FUJ_GUI_API_BASE_URL` | `http://localhost:8000` | Backend URL |
+| `FUJ_GUI_GUI_PORT` | `8050` | UI port |
+| `FUJ_GUI_POLL_INTERVAL_MS` | `500` | Status / graph refresh (ms) |
+| `FUJ_GUI_GRAPH_HISTORY_S` | `60` | Rolling graph window (seconds) |
+
+Both accept a `.env` file in the working directory.
+
+---
+
+## Project structure
+
+```
+src/
+├── fuj_backend/
+│   ├── api/              FastAPI routes, models, exception handlers, rate limiting
+│   ├── services/         FIM24725Service, state machine, rail controller, MCU interface
+│   ├── hardware/         PSU HAL (UDP), Arduino MCU (serial)
+│   └── config.py         pydantic-settings (FUJ_ prefix)
+└── fuj_gui/
+    ├── app.py            Dash factory + layout + main() entry point
+    ├── config.py         GUISettings (FUJ_GUI_ prefix)
+    ├── api_client.py     Synchronous httpx wrapper
+    ├── callbacks/        status, graph, logs callbacks
+    └── components/       header, controls, graph panel, log panel
 ```
 
 ---
 
-## Technology Stack
+## Documentation
 
-- **Backend:** FastAPI 0.115+, Uvicorn, Pydantic
-- **Frontend:** Dash 2.18+, Dash Bootstrap Components
-- **Integration:** Starlette WSGIMiddleware (ASGI ↔ WSGI bridge)
-- **API Client:** HTTPX
-- **Containerization:** Docker, Docker Compose
+| Document | Description |
+|---|---|
+| [docs/gui.md](docs/gui.md) | Dash UI reference — layout, controls, polling, configuration |
+| [docs/rest_api.md](docs/rest_api.md) | REST API reference — all 13 endpoints |
+| [docs/services_api.md](docs/services_api.md) | Service layer API reference |
+| [docs/arduino_mcu_api.md](docs/arduino_mcu_api.md) | Arduino MCU protocol |
+| [docs/psu_hal_api.md](docs/psu_hal_api.md) | PSU HAL API reference |
+| [docs/pi_setup.md](docs/pi_setup.md) | Raspberry Pi deployment guide |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed system architecture diagram |
 
----
+### Architecture Decision Records
 
-## Development Tools
-
-- **Dev Container:** Pre-configured VS Code development environment
-- **Docker:** Containerized deployment for Linux systems
-- **Python 3.12+:** Modern Python features and performance
-
----
-
-## Next Steps
-
-1. Define the hardware control requirements
-2. Implement the backend API structure
-3. Create the hardware abstraction layer
-4. Build the Dash-based web interface
-5. Integrate safety and validation layers
+| ADR | Decision |
+|---|---|
+| [ADR-001](docs/adr/ADR-001-psu-hal.md) | PSU Hardware Abstraction Layer |
+| [ADR-002](docs/adr/ADR-002-services-layer.md) | FIM24725 Services Layer |
+| [ADR-003](docs/adr/ADR-003-arduino-mcu.md) | Arduino MCU |
+| [ADR-004](docs/adr/ADR-004-rest-api.md) | REST API Layer |
 
 ---
 
-## License
+## Technology stack
 
-[Add license information]
-
----
-
-## Contributing
-
-[Add contribution guidelines]
+| Layer | Technology |
+|---|---|
+| UI | Dash 2.18+, dash-bootstrap-components (DARKLY), Plotly |
+| API client | httpx |
+| Backend | FastAPI, Uvicorn |
+| Rate limiting | slowapi |
+| Configuration | pydantic-settings |
+| Hardware | pyserial (MCU), UDP sockets (PSU) |
+| Python | 3.12+ |

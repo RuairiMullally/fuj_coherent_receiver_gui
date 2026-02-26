@@ -1,0 +1,2 @@
+[console_scripts]
+fuj-gui = fuj_gui.app:main

@@ -68,15 +68,14 @@ ls -la /dev/arduino   # should show: /dev/arduino -> ttyUSB0
 
 ---
 
-## 4. docker-compose — Arduino device passthrough
+## 4. Verify Arduino passthrough
 
-Add the `devices` entry to `docker-compose.yml` so the container can access
-the Arduino:
+The `docker-compose.yml` already includes the Arduino device passthrough for
+the `api` service. Confirm it is present:
 
 ```yaml
 services:
-  backend:
-    ...
+  api:
     devices:
       - /dev/arduino:/dev/arduino
 ```
@@ -85,19 +84,84 @@ services:
 
 ## 5. Build and deploy
 
-**On the Pi directly** (slow but simple):
+The application runs as two containers:
+
+| Container | Port | Description |
+|---|---|---|
+| `fuj_api` | 8000 | FastAPI backend (`Dockerfile.backend`) |
+| `fuj_gui` | 8050 | Dash UI (`Dockerfile.gui`) |
+
+Both use `network_mode: host` so the backend can bind to the PSU-facing NICs
+(`10.10.10.50`, `10.10.20.50`) directly. The GUI reaches the API at
+`http://localhost:8000`.
+
+### Build and start (on the Pi)
+
 ```bash
+# Clone / pull the repository
+git clone <repo-url> fuj_coherent_receiver_gui
+cd fuj_coherent_receiver_gui
+
+# Build both images and start in the background
 docker compose build
 docker compose up -d
 ```
 
-**Cross-compile on dev machine, transfer to Pi** (faster):
+The GUI container waits for the API healthcheck to pass before starting.
+Watch startup progress with:
+
 ```bash
-docker buildx build --platform linux/arm64 \
-  -f Dockerfile.backend -t fuj_backend --load .
-docker save fuj_backend | ssh pi@<tailscale-ip> docker load
+docker compose logs -f
 ```
 
-No changes to `Dockerfile.backend` or `pyproject.toml` are needed —
-`python:3.12-slim` has an official arm64 variant that Docker pulls
-automatically when building on arm64.
+Open `http://<pi-tailscale-ip>:8050` in a browser.
+
+### Cross-compile on dev machine, transfer to Pi (faster builds)
+
+```bash
+# Build arm64 images on the dev machine
+docker buildx build --platform linux/arm64 \
+  -f Dockerfile.backend -t fuj_backend:latest --load .
+docker buildx build --platform linux/arm64 \
+  -f Dockerfile.gui     -t fuj_gui:latest     --load .
+
+# Transfer to the Pi
+docker save fuj_backend:latest | ssh pi@<tailscale-ip> docker load
+docker save fuj_gui:latest     | ssh pi@<tailscale-ip> docker load
+
+# On the Pi — start with the pre-loaded images
+ssh pi@<tailscale-ip>
+cd fuj_coherent_receiver_gui
+docker compose up -d
+```
+
+`python:3.12-slim` has an official `arm64` variant — no changes to either
+Dockerfile are needed.
+
+### Useful commands
+
+```bash
+# View live logs from both containers
+docker compose logs -f
+
+# View API logs only
+docker compose logs -f api
+
+# Stop everything
+docker compose down
+
+# Restart after a config change
+docker compose restart api
+
+# Check container status and health
+docker compose ps
+```
+
+### Adjusting configuration
+
+Edit the `environment` section in `docker-compose.yml` for the relevant
+service. Changes take effect after:
+
+```bash
+docker compose up -d --no-build
+```
