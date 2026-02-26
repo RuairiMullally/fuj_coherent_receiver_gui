@@ -73,7 +73,7 @@ FUJ_GUI_DEBUG=true
 │  GA_Y  [ 1.000 ] [Set]    │                                 │
 │        0.0 – 3.3 V        │                                 │
 │─────────────────────────────────────────────────────────────│
-│  Logs (scrollable, 200px)                                   │
+│  Logs (scrollable, ~20 vh)                                  │
 │  [INFO    ] fim24725.service — Step 4: Programming…         │
 │  [DEBUG   ] fim24725.rails   — VCC_3V3: Write verified…     │
 └─────────────────────────────────────────────────────────────┘
@@ -140,6 +140,12 @@ Each row has:
   `POST /api/v1/controls/<rail>` endpoint.
 - All inputs and Set buttons are **disabled** when state is not `READY`.
 
+**Input validation**: the browser enforces `min`/`max` limits on the number input
+(marking it invalid if exceeded). The API independently validates the range via
+Pydantic constraints (`VoaRequest`: 0–4.8 V; `OaGaRequest`: 0–3.3 V) and returns
+HTTP 422 for any out-of-range value — displayed in the error toast. The service
+layer additionally clamps as a final backstop.
+
 **GA pre-staging**: When state is `READY` and mode is `AGC`, GA_X and GA_Y rows
 show a grey *pre-staging* badge. The PSU accepts the written value and applies it
 the moment the mode switches to MGC — no need to re-enter GA values after the
@@ -160,9 +166,13 @@ A Plotly time-series chart with five traces:
 | MPD | `#a8dadc` (teal) |
 
 - Y-axis: 0 – 2.2 V (FIM24725 PI outputs are 0–2 V; MPD is similarly scaled).
-- X-axis: rolling window controlled by `FUJ_GUI_GRAPH_HISTORY_S` (default 60 s).
+- X-axis: a fixed-width window of `FUJ_GUI_GRAPH_HISTORY_S` seconds (default 60 s),
+  anchored to the current time on every render. The window scrolls forward as new
+  data arrives; grid lines stay fixed and do not shift. Ticks display as `HH:MM:SS`.
 - `uirevision="constant"` preserves the user's zoom/pan between updates.
 - Data is appended on every status poll and trimmed to the rolling window.
+- Before STARTUP the graph shows a *"Waiting for telemetry"* annotation; PI/MPD
+  traces appear once the device reaches `READY` state.
 
 ---
 

@@ -55,6 +55,7 @@ def _build_layout(settings: GUISettings) -> html.Div:
             # Hidden stores and intervals
             dcc.Store(id="status-store", storage_type="memory"),
             dcc.Store(id="graph-store", storage_type="memory"),
+            dcc.Store(id="mode-initialized-store", storage_type="memory", data=False),
             dcc.Interval(
                 id="interval-status",
                 interval=settings.poll_interval_ms,

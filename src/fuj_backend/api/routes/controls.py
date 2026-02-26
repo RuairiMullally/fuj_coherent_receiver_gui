@@ -17,11 +17,12 @@ from fuj_backend.api.deps import get_service
 from fuj_backend.api.limiter import limiter
 from fuj_backend.api.models import (
     ActionResponse,
+    OaGaRequest,
     PeakIndicatorsOut,
     SweepPoint,
     SweepRequest,
     SweepResponse,
-    VoltageRequest,
+    VoaRequest,
 )
 from fuj_backend.services.fim24725_service import FIM24725Service
 
@@ -32,7 +33,7 @@ router = APIRouter()
 @limiter.limit("10/minute")
 def post_voa(
     request: Request,
-    body: VoltageRequest,
+    body: VoaRequest,
     service: FIM24725Service = Depends(get_service),
 ) -> ActionResponse:
     """Set VOA control voltage (0–4.8 V)."""
@@ -44,7 +45,7 @@ def post_voa(
 @limiter.limit("10/minute")
 def post_oa_x(
     request: Request,
-    body: VoltageRequest,
+    body: OaGaRequest,
     service: FIM24725Service = Depends(get_service),
 ) -> ActionResponse:
     """Set OA_X output amplitude (0–3.3 V)."""
@@ -56,7 +57,7 @@ def post_oa_x(
 @limiter.limit("10/minute")
 def post_oa_y(
     request: Request,
-    body: VoltageRequest,
+    body: OaGaRequest,
     service: FIM24725Service = Depends(get_service),
 ) -> ActionResponse:
     """Set OA_Y output amplitude (0–3.3 V)."""
@@ -68,7 +69,7 @@ def post_oa_y(
 @limiter.limit("10/minute")
 def post_ga_x(
     request: Request,
-    body: VoltageRequest,
+    body: OaGaRequest,
     service: FIM24725Service = Depends(get_service),
 ) -> ActionResponse:
     """Set GA_X gain adjust voltage (0–3.3 V).
@@ -84,7 +85,7 @@ def post_ga_x(
 @limiter.limit("10/minute")
 def post_ga_y(
     request: Request,
-    body: VoltageRequest,
+    body: OaGaRequest,
     service: FIM24725Service = Depends(get_service),
 ) -> ActionResponse:
     """Set GA_Y gain adjust voltage (0–3.3 V). See ga_x note on pre-staging."""

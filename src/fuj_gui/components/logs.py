@@ -17,12 +17,31 @@ _LEVEL_STYLES: dict[str, dict] = {
 def build_logs_panel() -> dbc.Card:
     return dbc.Card(
         [
-            dbc.CardHeader("Logs"),
+            dbc.CardHeader(
+                dbc.Row(
+                    [
+                        dbc.Col("Logs", width="auto", className="fw-bold"),
+                        dbc.Col(
+                            dbc.Switch(
+                                id="log-debug-toggle",
+                                label="Debug",
+                                value=False,
+                                style={"marginBottom": "0"},
+                            ),
+                            className="d-flex align-items-center justify-content-end",
+                        ),
+                    ],
+                    align="center",
+                    justify="between",
+                    className="g-0",
+                ),
+            ),
             dbc.CardBody(
                 html.Div(
                     id="log-panel",
                     style={
-                        "height": "200px",
+                        "height": "20vh",
+                        "minHeight": "150px",
                         "overflowY": "scroll",
                         "fontFamily": "monospace",
                         "fontSize": "0.8rem",

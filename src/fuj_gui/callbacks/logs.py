@@ -18,13 +18,16 @@ def _register_log_poll(app) -> None:
     @app.callback(
         Output("log-panel", "children"),
         Input("interval-logs", "n_intervals"),
+        Input("log-debug-toggle", "value"),
     )
-    def poll_logs(n_intervals):
+    def poll_logs(n_intervals, show_debug):
         data = _api.get_client().get_logs(n=100)
         if "error" in data:
             raise PreventUpdate
 
         lines = data.get("lines", [])
+        if not show_debug:
+            lines = [l for l in lines if l.get("level") != "DEBUG"]
         from dash import html
         children = [format_log_line(line) for line in lines]
         # Sentinel div at the bottom for auto-scroll

@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.get("/logs", response_model=LogsResponse)
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 def get_logs(
     request: Request,
     n: int = Query(

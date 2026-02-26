@@ -2,13 +2,17 @@
 
 graph-store format:
     {
-        "t":      ["2026-02-25T14:32:01", ...],
+        "t":      ["2026-02-25T14:32:01.123456", ...],  # ISO datetime strings
         "pi_xi":  [0.512, ...],
         "pi_xq":  [0.480, ...],
         "pi_yi":  [0.523, ...],
         "pi_yq":  [0.491, ...],
         "mpd":    [0.823, ...],
     }
+
+Timestamps are stored as ISO strings so Plotly can interpret them as datetime
+objects. The X-axis range is pinned to [now − window, now] on every render,
+keeping the grid lines stable as data scrolls in from the right.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from fuj_gui.components.graph import TRACE_COLORS, empty_figure, _BG
 
 def register(app, settings) -> None:
     _register_store_update(app, settings)
-    _register_graph_render(app)
+    _register_graph_render(app, settings)
 
 
 def _register_store_update(app, settings) -> None:
@@ -48,7 +52,7 @@ def _register_store_update(app, settings) -> None:
         if graph_data is None:
             graph_data = {"t": [], "pi_xi": [], "pi_xq": [], "pi_yi": [], "pi_yq": [], "mpd": []}
 
-        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        ts = datetime.datetime.now().isoformat()
         graph_data["t"].append(ts)
         graph_data["pi_xi"].append(pi.get("pi_xi"))
         graph_data["pi_xq"].append(pi.get("pi_xq"))
@@ -65,7 +69,9 @@ def _register_store_update(app, settings) -> None:
         return graph_data
 
 
-def _register_graph_render(app) -> None:
+def _register_graph_render(app, settings) -> None:
+    window_s = settings.graph_history_s
+
     @app.callback(
         Output("pi-mpd-graph", "figure"),
         Input("graph-store", "data"),
@@ -89,6 +95,11 @@ def _register_graph_render(app) -> None:
             for key in keys
         ]
 
+        # Pin X-axis to a fixed window anchored to now so grid lines stay still
+        now = datetime.datetime.now()
+        x_end = now.isoformat()
+        x_start = (now - datetime.timedelta(seconds=window_s)).isoformat()
+
         return {
             "data": traces,
             "layout": {
@@ -97,8 +108,11 @@ def _register_graph_render(app) -> None:
                 "plot_bgcolor": _BG,
                 "font": {"color": "#cdd6f4"},
                 "xaxis": {
-                    "gridcolor": "#313244",
-                    "tickfont": {"color": "#cdd6f4"},
+                    "type":       "date",
+                    "range":      [x_start, x_end],
+                    "tickformat": "%H:%M:%S",
+                    "gridcolor":  "#313244",
+                    "tickfont":   {"color": "#cdd6f4"},
                 },
                 "yaxis": {
                     "title": "Voltage (V)",

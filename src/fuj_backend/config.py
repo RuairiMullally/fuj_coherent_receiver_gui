@@ -56,11 +56,16 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Rate limits (slowapi / limits library format: "N/period")
     # period options: second, minute, hour, day
+    #
+    # NOTE: These fields document the limits in use but are NOT wired into
+    # the route decorators. The @limiter.limit() strings in routes/*.py are
+    # hardcoded and evaluated at import time, before Settings is instantiated.
+    # To change a limit: update both this default AND the decorator string.
     # ------------------------------------------------------------------
     rate_control: str = "10/minute"    # startup / shutdown / mode / set* endpoints
-    rate_status: str = "120/minute"    # GET /status — 2/sec suits a 500ms UI poll
+    rate_status: str = "300/minute"    # GET /status — 2.5× headroom over 500ms UI poll (120/min)
     rate_telemetry: str = "120/minute" # GET /telemetry/*
-    rate_logs: str = "30/minute"       # GET /logs
+    rate_logs: str = "60/minute"       # GET /logs — 2× headroom over 2s UI poll (30/min)
 
     model_config = {
         "env_file": ".env",

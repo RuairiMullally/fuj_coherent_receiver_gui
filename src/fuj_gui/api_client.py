@@ -34,12 +34,12 @@ class APIClient:
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
             return {"error": str(exc)}
 
-    def _post(self, path: str, body: dict | None = None) -> dict:
+    def _post(self, path: str, body: dict | None = None, timeout: float | None = None) -> dict:
         try:
             r = httpx.post(
                 f"{self._base}{path}",
                 json=body,
-                timeout=self._timeout,
+                timeout=timeout if timeout is not None else self._timeout,
             )
             r.raise_for_status()
             return r.json()
@@ -54,10 +54,10 @@ class APIClient:
         return self._get("/status")
 
     def startup(self, mode: str = "AGC") -> dict:
-        return self._post("/startup", {"mode": mode})
+        return self._post("/startup", {"mode": mode}, timeout=20.0)
 
     def shutdown(self) -> dict:
-        return self._post("/shutdown")
+        return self._post("/shutdown", timeout=20.0)
 
     def set_mode(self, mode: str) -> dict:
         return self._post("/mode", {"mode": mode})

@@ -276,6 +276,7 @@ class FIM24725Service:
         Execute full startup sequence.
 
         Follows the bring-up algorithm:
+        0. Lock PSU front panel buttons
         1. Verify safe initial state
         2. Program protections and setpoints (OVP/OCP/Vset/Iset per config)
         3. Enable VCC, verify
@@ -300,6 +301,10 @@ class FIM24725Service:
 
         try:
             self._state.transition_to(SystemState.STARTING)
+
+            # Step 0: Lock PSU front panels (prevents accidental physical button presses)
+            self._logger.info("Step 0: Locking PSU front panels")
+            self._rails.lock_panels()
 
             # Step 1: Verify initial safe state
             self._ensure_safe_initial_state()
@@ -521,6 +526,14 @@ class FIM24725Service:
                     self._logger.error(f"{rail.value} disable failed: {e}")
 
             self._state.transition_to(SystemState.OFF)
+
+            # Step 6: Unlock PSU front panels
+            self._logger.info("Step 6: Unlocking PSU front panels")
+            try:
+                self._rails.unlock_panels()
+            except Exception as e:
+                self._logger.error(f"Panel unlock failed: {e}")
+
             self._logger.info("=== Shutdown Complete ===")
 
         except Exception as e:
@@ -685,6 +698,7 @@ class FIM24725Service:
         """
         pi = None
         mpd = None
+        rails: dict = {}
 
         if self._state.state == SystemState.READY:
             try:
@@ -692,11 +706,15 @@ class FIM24725Service:
                 mpd = self._mcu.read_mpd()
             except Exception as e:
                 self._logger.warning(f"MCU read failed: {e}")
+            try:
+                rails = self._rails.measure_all_rails()
+            except Exception as e:
+                self._logger.warning(f"Rail measurement failed: {e}")
 
         return SystemSnapshot(
             state=self._state.state,
             mode=self._state.mode,
-            rails=self._rails.measure_all_rails(),
+            rails=rails,
             sd_enabled=(self._state.state == SystemState.READY),
             peak_indicators=pi,
             mpd_value=mpd,
@@ -861,6 +879,12 @@ class FIM24725Service:
                     self._logger.error(f"{rail.value} disable failed: {e}")
 
             self._state.transition_to(SystemState.OFF)
+
+            try:
+                self._rails.unlock_panels()
+            except Exception as e:
+                self._logger.error(f"Panel unlock failed: {e}")
+
             self._logger.info("=== Shutdown Complete ===")
 
         except Exception as e:

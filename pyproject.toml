@@ -13,6 +13,7 @@ dependencies = [
     "dash-bootstrap-components>=1.6.0",
     "pyserial>=3.5",
     "slowapi>=0.1.9",
+    "gunicorn>=21.0",
 ]
 
 [build-system]

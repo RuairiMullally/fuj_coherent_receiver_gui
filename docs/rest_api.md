@@ -42,9 +42,9 @@ in the working directory.
 | `FUJ_LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `FUJ_LOG_DIR` | `logs` | Directory for rotating log files |
 | `FUJ_RATE_CONTROL` | `10/minute` | Rate limit for control endpoints |
-| `FUJ_RATE_STATUS` | `120/minute` | Rate limit for `GET /status` |
+| `FUJ_RATE_STATUS` | `300/minute` | Rate limit for `GET /status` |
 | `FUJ_RATE_TELEMETRY` | `120/minute` | Rate limit for telemetry endpoints |
-| `FUJ_RATE_LOGS` | `30/minute` | Rate limit for `GET /logs` |
+| `FUJ_RATE_LOGS` | `60/minute` | Rate limit for `GET /logs` |
 
 ---
 
@@ -66,12 +66,12 @@ None. The API is intended for local network deployment only.
 Enforced per client IP via [slowapi](https://github.com/laurentS/slowapi).
 Exceeded limits return `429 Too Many Requests`.
 
-| Endpoint group | Default limit |
-|---|---|
-| `POST /startup`, `/shutdown`, `/mode`, all `/controls/*` | 10 per minute |
-| `GET /status` | 120 per minute |
-| `GET /telemetry/*` | 120 per minute |
-| `GET /logs` | 30 per minute |
+| Endpoint group | Limit | Notes |
+|---|---|---|
+| `POST /startup`, `/shutdown`, `/mode`, all `/controls/*` | 10/minute | Prevents accidental burst commands |
+| `GET /status` | 300/minute | 2.5× headroom over the default 500 ms UI poll |
+| `GET /telemetry/*` | 120/minute | Not polled by the UI directly (status snapshot includes telemetry) |
+| `GET /logs` | 60/minute | 2× headroom over the default 2 s UI poll |
 
 ---
 
@@ -256,20 +256,33 @@ Switches between AGC and MGC modes. Requires state `READY`.
 
 ### Controls
 
-All control endpoints require state `READY`. All accept a `VoltageRequest` body
-and return an `ActionResponse`.
+All control endpoints require state `READY` and return an `ActionResponse`.
+
+**Voltage validation:** the API enforces range constraints via Pydantic `Field`
+before the request reaches the service layer. Out-of-range values return HTTP 422
+with a descriptive message. The service layer additionally clamps silently as a
+defence-in-depth backstop (this should never trigger in normal use).
 
 #### `POST /api/v1/controls/voa`
 
 Set Variable Optical Attenuator control voltage.
 
-| Range | Units |
-|---|---|
-| 0.0 – 4.8 | V |
+**Request body (`VoaRequest`)**
+
+| Field | Type | Range | Description |
+|---|---|---|---|
+| `voltage` | `float` | 0.0 – 4.8 V | Target VOA voltage |
 
 ```json
 { "voltage": 2.5 }
 ```
+
+**Errors**
+
+| Code | Condition |
+|---|---|
+| `422` | `voltage` outside 0.0 – 4.8 V |
+| `409` | System not in `READY` state |
 
 ---
 
@@ -277,19 +290,17 @@ Set Variable Optical Attenuator control voltage.
 
 Set Output Amplitude X.
 
-| Range | Units |
-|---|---|
-| 0.0 – 3.3 | V |
+**Request body (`OaGaRequest`)**
+
+| Field | Type | Range |
+|---|---|---|
+| `voltage` | `float` | 0.0 – 3.3 V |
 
 ---
 
 #### `POST /api/v1/controls/oa_y`
 
-Set Output Amplitude Y.
-
-| Range | Units |
-|---|---|
-| 0.0 – 3.3 | V |
+Set Output Amplitude Y. Same request body and range as `oa_x`.
 
 ---
 
@@ -297,9 +308,11 @@ Set Output Amplitude Y.
 
 Set Gain Adjust X.
 
-| Range | Units |
-|---|---|
-| 0.0 – 3.3 | V |
+**Request body (`OaGaRequest`)**
+
+| Field | Type | Range |
+|---|---|---|
+| `voltage` | `float` | 0.0 – 3.3 V |
 
 Safe to call in AGC mode — the FIM24725 ignores GA pins in AGC, but the PSU accepts the
 value, pre-staging it for the next MGC session.
@@ -308,13 +321,7 @@ value, pre-staging it for the next MGC session.
 
 #### `POST /api/v1/controls/ga_y`
 
-Set Gain Adjust Y.
-
-| Range | Units |
-|---|---|
-| 0.0 – 3.3 | V |
-
-Same pre-staging behaviour as `ga_x`.
+Set Gain Adjust Y. Same request body and range as `ga_x`. Same pre-staging behaviour.
 
 ---
 

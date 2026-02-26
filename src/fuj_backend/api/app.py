@@ -93,9 +93,14 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # --- Logging setup ---
     root_logger = setup_service_logger()
-    root_logger.setLevel(
-        getattr(logging, settings.log_level.upper(), logging.INFO)
-    )
+    # Apply the configured level to file/console handlers so they only emit
+    # records at that level and above. The root logger itself must stay at
+    # DEBUG so that the log buffer (added below) can capture everything.
+    configured_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    for h in root_logger.handlers:
+        h.setLevel(configured_level)
+    root_logger.setLevel(logging.DEBUG)
+
     api_logger = _setup_api_logger(settings.log_dir, settings.log_level)
 
     log_buffer = LogBufferHandler(maxlen=500)

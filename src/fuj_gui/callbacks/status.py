@@ -2,11 +2,20 @@
 
 Registers:
 - Poll callback: status-store ← interval-status
-- Header update: state-badge, mode-switch, buttons ← status-store
-- Control placeholder update ← status-store
+- Header update: state-badge, mode-switch disabled, buttons ← status-store
+- Mode init (once): mode-switch.value ← first non-empty status-store
+- Control placeholder + disabled update ← status-store
 - Mode toggle callback
 - Startup/shutdown modal open + confirm callbacks
 - SET button callbacks (voa, oa-x, oa-y, ga-x, ga-y)
+
+Mode switch design note:
+    update_header does NOT write mode-switch.value. Writing it on every 500ms
+    poll would race with the user's click (Dash cannot distinguish programmatic
+    from user-initiated value changes). Instead:
+      - _register_mode_init sets the value exactly once on first status load.
+      - toggle_mode, startup_confirm, and shutdown_confirm update it explicitly
+        after each API call confirms the new mode.
 """
 
 from __future__ import annotations
@@ -32,6 +41,7 @@ _ALL_CONTROL_SUFFIXES = ("voa", "oa-x", "oa-y", "ga-x", "ga-y")
 def register(app, settings: GUISettings) -> None:  # noqa: ARG001
     _register_poll(app)
     _register_header_update(app)
+    _register_mode_init(app)
     _register_control_placeholders(app)
     _register_mode_toggle(app)
     _register_startup_modal_open(app)
@@ -61,14 +71,14 @@ def _register_poll(app) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. Header update (badge, mode switch, buttons)
+# 2. Header update — badge + button disabled states only.
+#    Does NOT write mode-switch.value (see module docstring).
 # ---------------------------------------------------------------------------
 
 def _register_header_update(app) -> None:
     @app.callback(
         Output("state-badge", "children"),
         Output("state-badge", "color"),
-        Output("mode-switch", "value"),
         Output("mode-switch", "disabled"),
         Output("startup-btn", "disabled"),
         Output("shutdown-btn", "disabled"),
@@ -79,19 +89,38 @@ def _register_header_update(app) -> None:
             raise PreventUpdate
 
         state = data.get("state", "OFF")
-        mode = data.get("mode", "AGC")
 
         badge_color = _STATE_COLORS.get(state, "secondary")
-        mode_value = mode == "MGC"
         mode_disabled = state != "READY"
         startup_disabled = state != "OFF"
         shutdown_disabled = state in ("OFF", "SHUTTING_DOWN")
 
-        return state, badge_color, mode_value, mode_disabled, startup_disabled, shutdown_disabled
+        return state, badge_color, mode_disabled, startup_disabled, shutdown_disabled
 
 
 # ---------------------------------------------------------------------------
-# 3. Control placeholders + disabled state + GA pre-staging badge
+# 3. Mode switch — one-time initialisation on first status load.
+#    After the flag flips to True this callback permanently raises PreventUpdate,
+#    so subsequent polls never touch mode-switch.value again.
+# ---------------------------------------------------------------------------
+
+def _register_mode_init(app) -> None:
+    @app.callback(
+        Output("mode-switch", "value"),
+        Output("mode-initialized-store", "data"),
+        Input("status-store", "data"),
+        State("mode-initialized-store", "data"),
+        prevent_initial_call=True,
+    )
+    def init_mode_once(status_data, initialized):
+        if initialized or not status_data:
+            raise PreventUpdate
+        mode = status_data.get("mode", "AGC")
+        return (mode == "MGC"), True
+
+
+# ---------------------------------------------------------------------------
+# 4. Control placeholders + disabled state (inputs AND buttons) + GA badges
 # ---------------------------------------------------------------------------
 
 def _register_control_placeholders(app) -> None:
@@ -106,6 +135,7 @@ def _register_control_placeholders(app) -> None:
     outputs = []
     for s in _ALL_CONTROL_SUFFIXES:
         outputs.append(Output(f"input-{s}", "placeholder"))
+        outputs.append(Output(f"input-{s}", "disabled"))
         outputs.append(Output(f"btn-set-{s}", "disabled"))
     for s in _GA_SUFFIXES:
         outputs.append(Output(f"prestage-badge-{s}", "style"))
@@ -129,10 +159,11 @@ def _register_control_placeholders(app) -> None:
             rail = rails.get(rail_name, {})
             voltage = rail.get("voltage")
             placeholder = f"{voltage:.3f}" if voltage is not None else "—"
-            result.append(placeholder)
-            result.append(not ready)
+            result.append(placeholder)   # input placeholder
+            result.append(not ready)     # input disabled
+            result.append(not ready)     # button disabled
 
-        # GA pre-staging badges: show when mode == AGC and state == READY
+        # GA pre-staging badges: visible in AGC mode when READY
         show_prestage = ready and mode == "AGC"
         badge_style = {"display": "inline"} if show_prestage else {"display": "none"}
         result.append(badge_style)
@@ -142,7 +173,7 @@ def _register_control_placeholders(app) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. Mode toggle
+# 5. Mode toggle
 # ---------------------------------------------------------------------------
 
 def _register_mode_toggle(app) -> None:
@@ -150,6 +181,7 @@ def _register_mode_toggle(app) -> None:
         Output("status-store", "data", allow_duplicate=True),
         Output("error-toast", "is_open", allow_duplicate=True),
         Output("error-toast-body", "children", allow_duplicate=True),
+        Output("mode-switch", "value", allow_duplicate=True),
         Input("mode-switch", "value"),
         State("status-store", "data"),
         prevent_initial_call=True,
@@ -166,17 +198,19 @@ def _register_mode_toggle(app) -> None:
 
         result = _api.get_client().set_mode(target_mode)
         if "error" in result:
-            return no_update, True, result["error"]
+            # Revert the switch to the server-confirmed mode
+            return no_update, True, result["error"], (current_mode == "MGC")
 
-        # Refresh status
         status = _api.get_client().get_status()
         if "error" in status:
-            return no_update, True, status["error"]
-        return status, False, ""
+            return no_update, True, status["error"], no_update
+
+        confirmed_mode = status.get("mode", "AGC")
+        return status, False, "", (confirmed_mode == "MGC")
 
 
 # ---------------------------------------------------------------------------
-# 5. Startup modal open
+# 6. Startup modal open
 # ---------------------------------------------------------------------------
 
 def _register_startup_modal_open(app) -> None:
@@ -192,7 +226,7 @@ def _register_startup_modal_open(app) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 6. Startup confirm
+# 7. Startup confirm
 # ---------------------------------------------------------------------------
 
 def _register_startup_confirm(app) -> None:
@@ -201,6 +235,7 @@ def _register_startup_confirm(app) -> None:
         Output("status-store", "data", allow_duplicate=True),
         Output("error-toast", "is_open", allow_duplicate=True),
         Output("error-toast-body", "children", allow_duplicate=True),
+        Output("mode-switch", "value", allow_duplicate=True),
         Input("startup-modal-confirm", "n_clicks"),
         Input("startup-modal-cancel", "n_clicks"),
         State("startup-modal-mode", "value"),
@@ -214,25 +249,26 @@ def _register_startup_confirm(app) -> None:
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         if trigger_id == "startup-modal-cancel":
-            return False, no_update, False, ""
+            return False, no_update, False, "", no_update
 
-        # Confirm clicked
         if not confirm_clicks:
             raise PreventUpdate
 
-        result = _api.get_client().startup(mode or "AGC")
+        startup_mode = mode or "AGC"
+        result = _api.get_client().startup(startup_mode)
         if "error" in result:
-            return False, no_update, True, result["error"]
+            return False, no_update, True, result["error"], no_update
 
         status = _api.get_client().get_status()
         if "error" in status:
-            return False, no_update, True, status["error"]
+            return False, no_update, True, status["error"], no_update
 
-        return False, status, False, ""
+        confirmed_mode = status.get("mode", "AGC")
+        return False, status, False, "", (confirmed_mode == "MGC")
 
 
 # ---------------------------------------------------------------------------
-# 7. Shutdown modal open
+# 8. Shutdown modal open
 # ---------------------------------------------------------------------------
 
 def _register_shutdown_modal_open(app) -> None:
@@ -248,7 +284,7 @@ def _register_shutdown_modal_open(app) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 8. Shutdown confirm
+# 9. Shutdown confirm
 # ---------------------------------------------------------------------------
 
 def _register_shutdown_confirm(app) -> None:
@@ -257,6 +293,7 @@ def _register_shutdown_confirm(app) -> None:
         Output("status-store", "data", allow_duplicate=True),
         Output("error-toast", "is_open", allow_duplicate=True),
         Output("error-toast-body", "children", allow_duplicate=True),
+        Output("mode-switch", "value", allow_duplicate=True),
         Input("shutdown-modal-confirm", "n_clicks"),
         Input("shutdown-modal-cancel", "n_clicks"),
         prevent_initial_call=True,
@@ -269,24 +306,25 @@ def _register_shutdown_confirm(app) -> None:
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         if trigger_id == "shutdown-modal-cancel":
-            return False, no_update, False, ""
+            return False, no_update, False, "", no_update
 
         if not confirm_clicks:
             raise PreventUpdate
 
         result = _api.get_client().shutdown()
         if "error" in result:
-            return False, no_update, True, result["error"]
+            return False, no_update, True, result["error"], no_update
 
         status = _api.get_client().get_status()
         if "error" in status:
-            return False, no_update, True, status["error"]
+            return False, no_update, True, status["error"], no_update
 
-        return False, status, False, ""
+        # Shutdown always returns device to OFF/AGC
+        return False, status, False, "", False
 
 
 # ---------------------------------------------------------------------------
-# 9. SET button callbacks
+# 10. SET button callbacks
 # ---------------------------------------------------------------------------
 
 def _register_set_buttons(app) -> None:

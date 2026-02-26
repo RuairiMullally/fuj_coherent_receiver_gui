@@ -62,7 +62,7 @@ def _build_status(service: FIM24725Service) -> ServiceStatusResponse:
 
 
 @router.get("/status", response_model=ServiceStatusResponse)
-@limiter.limit("120/minute")
+@limiter.limit("300/minute")
 def get_status(
     request: Request,
     service: FIM24725Service = Depends(get_service),

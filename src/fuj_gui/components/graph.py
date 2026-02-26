@@ -22,7 +22,7 @@ def build_graph_panel() -> dbc.Card:
         dbc.CardBody(
             dcc.Graph(
                 id="pi-mpd-graph",
-                style={"height": "400px"},
+                style={"height": "55vh", "minHeight": "350px"},
                 config={"displayModeBar": False},
             )
         ),
@@ -64,5 +64,16 @@ def empty_figure() -> dict:
             "legend": {"font": {"color": "#cdd6f4"}},
             "margin": {"l": 50, "r": 20, "t": 40, "b": 50},
             "uirevision": "constant",
+            "annotations": [
+                {
+                    "text": "Waiting for telemetry — start the device to begin",
+                    "xref": "paper",
+                    "yref": "paper",
+                    "x": 0.5,
+                    "y": 0.5,
+                    "showarrow": False,
+                    "font": {"color": "#6c757d", "size": 13},
+                }
+            ],
         },
     }

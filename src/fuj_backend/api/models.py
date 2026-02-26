@@ -6,9 +6,9 @@ so that the API contract can evolve independently of internal data structures.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from fuj_backend.api.log_buffer import LogLine
 from fuj_backend.services.models import OperatingMode, RailState, SystemState
@@ -26,8 +26,14 @@ class ModeRequest(BaseModel):
     mode: OperatingMode
 
 
-class VoltageRequest(BaseModel):
-    voltage: float
+class VoaRequest(BaseModel):
+    """VOA voltage setpoint — clamped to 0–4.8 V at the service layer too."""
+    voltage: Annotated[float, Field(ge=0.0, le=4.8)]
+
+
+class OaGaRequest(BaseModel):
+    """OA_X / OA_Y / GA_X / GA_Y voltage setpoint — clamped to 0–3.3 V."""
+    voltage: Annotated[float, Field(ge=0.0, le=3.3)]
 
 
 class SweepRequest(BaseModel):

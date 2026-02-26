@@ -104,8 +104,11 @@ files and registered on `app.state`. This ensures a single consistent limit stor
 Rate limits chosen:
 - **Control endpoints** (startup/shutdown/mode/set*): 10/minute — prevents accidental
   command bursts while accommodating normal manual operation
-- **Status/telemetry**: 120/minute — 2/second, suits a 500 ms UI poll interval
-- **Logs**: 30/minute — less frequent; UI updates log panel on user scroll or timer
+- **Status**: 300/minute — 2.5× headroom over the 500 ms UI poll (120/min) to
+  absorb JavaScript timer jitter without generating 429 errors in normal operation
+- **Telemetry**: 120/minute — not polled directly by the UI (status snapshot includes
+  telemetry); limit exists for external callers only
+- **Logs**: 60/minute — 2× headroom over the 2 s UI poll (30/min)
 
 ### 7. Exception → HTTP status mapping
 
@@ -137,6 +140,13 @@ service-layer models (`services/models.py`). This decoupling:
 - Avoids exposing internal fields (e.g. `RailConfig`) that are not relevant to clients
 - Permits field renaming or restructuring at the API boundary (e.g. `rails` keyed by
   string rather than `RailName` enum for clean JSON serialisation)
+
+Voltage control endpoints use endpoint-specific request models with Pydantic `Field`
+constraints: `VoaRequest` (0–4.8 V) for `/voa` and `OaGaRequest` (0–3.3 V) for the
+remaining control endpoints. FastAPI returns HTTP 422 with a descriptive message for
+any out-of-range value before the request reaches the service. The service layer's
+`RailController._clamp_and_validate()` clamps silently as a defence-in-depth backstop
+and emits a `WARNING` log if clamping occurs.
 
 ### 9. In-memory log buffer
 
@@ -187,6 +197,8 @@ local deployment where no external access is intended.
   for single-user lab equipment but would need a job queue design for multi-user use.
 - **Rate limits are hard-coded in decorators**: The `Settings.rate_*` fields document
   intent but the decorator strings are duplicated. Changing limits requires a code edit.
+  Limits are set with generous headroom (status: 300/min vs 120/min poll rate) to avoid
+  spurious 429 errors from JavaScript timer jitter.
 - **In-memory log buffer is not persistent**: Log lines are lost on server restart.
   The rotating file logs remain; the buffer is for live UI display only.
 
