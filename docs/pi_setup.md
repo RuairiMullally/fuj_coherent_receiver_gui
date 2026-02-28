@@ -30,17 +30,97 @@ sudo usermod -aG docker $USER
 
 Log out and back in for the group change to take effect.
 
+### Enable Docker on boot
+
+The package install enables the daemon automatically, but verify:
+
+```bash
+sudo systemctl enable docker containerd
+```
+
+### Automatic container start on boot
+
+Both containers have `restart: unless-stopped` in `docker-compose.yml`. This
+means Docker itself (not a separate cron job or systemd unit) is responsible
+for restarting them: when the Docker daemon comes up after a reboot, it checks
+its container records and starts any container whose restart policy says it
+should be running.
+
+The only requirement is that `docker compose up -d` has been run **at least
+once**. After that, every subsequent reboot brings both containers up
+automatically — no further action is needed.
+
 ---
 
-## 2. Install Tailscale
+## 2. Install and configure Tailscale
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 ```
 
+The installer registers `tailscaled` as a systemd service and enables it
+automatically — Tailscale reconnects on every subsequent reboot with no
+further action. `tailscale up` is only needed once (initial authentication).
+
 The Pi will receive a stable Tailscale IP and (with MagicDNS) a hostname
-reachable from anywhere on the tailnet.
+reachable from anywhere on the tailnet. Find the assigned hostname with:
+
+```bash
+tailscale status
+```
+
+### Restrict access with ACLs
+
+By default all devices on the tailnet can reach each other on all ports.
+Tighten this in the [Tailscale admin console](https://login.tailscale.com/admin/acls)
+under **Access Controls**. Replace the default policy with the following,
+which allows any authenticated tailnet member to reach the GUI and nothing
+else:
+
+```json
+{
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["autogroup:member"],
+      "dst": [
+        "autogroup:member:8050",
+        "autogroup:member:443"
+      ]
+    }
+  ]
+}
+```
+
+`autogroup:member` refers to any device authenticated to your tailnet.
+Port 443 is only needed if using `tailscale serve --https`; omit that line
+otherwise. Port 8000 (API) is bound to `127.0.0.1` on the Pi and is not
+reachable from outside the machine regardless, so it needs no ACL entry.
+
+### Optional: HTTPS via Tailscale Serve
+
+Tailscale can obtain a TLS certificate and proxy the GUI over HTTPS using the
+MagicDNS hostname, with no Nginx or manual certificate management:
+
+```bash
+sudo tailscale serve --https=443 --bg http://localhost:8050
+```
+
+The `--bg` flag persists the configuration across reboots. The GUI is then
+accessible at:
+
+```
+https://<pi-hostname>.<tailnet-name>.ts.net
+```
+
+with a valid Let's Encrypt certificate. To remove: `sudo tailscale serve reset`.
+
+> **Note:** Tailscale already encrypts all traffic with WireGuard, so HTTPS
+> adds TLS on top of an already-encrypted channel. The practical benefit is
+> cosmetic — no port number in the URL and no browser "Not Secure" warning.
+> Do **not** add `--funnel` to this command; that would expose the GUI to the
+> open internet.
 
 ---
 
@@ -114,7 +194,10 @@ Watch startup progress with:
 docker compose logs -f
 ```
 
-Open `http://<pi-tailscale-ip>:8050` in a browser.
+Open the GUI in a browser:
+
+- Plain HTTP: `http://<pi-tailscale-ip>:8050`
+- HTTPS (if `tailscale serve` was configured): `https://<pi-hostname>.<tailnet-name>.ts.net`
 
 ### Cross-compile on dev machine, transfer to Pi (faster builds)
 

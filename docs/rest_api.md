@@ -416,14 +416,19 @@ Read the monitor photodiode value.
 
 #### `GET /api/v1/logs`
 
-Returns recent log lines from the in-memory ring buffer (capacity: 500 lines).
+Returns log lines from the in-memory ring buffer (capacity: 500 lines).
 Captures output from all `fim24725.*` loggers (service, hardware, API).
+
+Supports **delta polling**: pass `since_seq` from the previous response to
+receive only new lines. The UI uses this to avoid re-sending the full history
+on every poll — typically 0–3 lines per 2 s tick on a quiet system.
 
 **Query parameters**
 
 | Parameter | Type | Default | Range | Description |
 |---|---|---|---|---|
-| `n` | `int` | `100` | 1–500 | Number of most-recent lines to return |
+| `n` | `int` | `100` | 1–500 | Lines to return on initial load (`since_seq` omitted or `-1`) |
+| `since_seq` | `int` | `-1` | ≥ -1 | Return only lines with `seq > since_seq`; `-1` returns the last `n` lines |
 
 **Response** `200`
 
@@ -431,24 +436,29 @@ Captures output from all `fim24725.*` loggers (service, hardware, API).
 {
   "lines": [
     {
+      "seq": 46,
       "timestamp": "2026-02-25T14:32:01",
       "level": "INFO",
       "logger": "fim24725.service",
       "message": "Step 4: Programming protections for VCC_3V3"
     },
     {
+      "seq": 47,
       "timestamp": "2026-02-25T14:32:02",
       "level": "DEBUG",
       "logger": "fim24725.rails",
       "message": "VCC_3V3: Write verified 3.301V ≈ 3.300V"
     }
   ],
-  "total_buffered": 47
+  "total_buffered": 48,
+  "max_seq": 47
 }
 ```
 
-`lines` is ordered oldest-first. `total_buffered` is the total number of lines currently
-in the buffer (useful for knowing how many lines were dropped).
+`lines` is ordered oldest-first. `seq` is a monotonic integer assigned to each
+log record; pass it back as `since_seq` on the next request to receive only
+newer lines. `max_seq` is the highest `seq` currently in the buffer (`-1` if
+the buffer is empty). `total_buffered` is the total lines in the buffer.
 
 ---
 

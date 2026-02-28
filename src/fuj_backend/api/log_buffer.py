@@ -16,6 +16,7 @@ from dataclasses import dataclass
 class LogLine:
     """Single structured log record."""
 
+    seq: int        # Monotonic sequence number — used for delta polling
     timestamp: str  # ISO-8601: "YYYY-MM-DDTHH:MM:SS"
     level: str      # DEBUG / INFO / WARNING / ERROR / CRITICAL
     logger: str     # Logger name, e.g. "fim24725.service"
@@ -37,6 +38,7 @@ class LogBufferHandler(logging.Handler):
     def __init__(self, maxlen: int = 500) -> None:
         super().__init__()
         self._buffer: deque[LogLine] = deque(maxlen=maxlen)
+        self._seq = 0
 
     def emit(self, record: logging.LogRecord) -> None:
         ts = datetime.datetime.fromtimestamp(record.created).strftime(
@@ -44,17 +46,27 @@ class LogBufferHandler(logging.Handler):
         )
         self._buffer.append(
             LogLine(
+                seq=self._seq,
                 timestamp=ts,
                 level=record.levelname,
                 logger=record.name,
                 message=record.getMessage(),
             )
         )
+        self._seq += 1
 
     def recent(self, n: int) -> list[LogLine]:
         """Return up to the last n records (oldest-first)."""
         lines = list(self._buffer)
         return lines[-n:] if n < len(lines) else lines
+
+    def since(self, seq: int) -> list[LogLine]:
+        """Return all records with seq > given value (oldest-first)."""
+        return [l for l in self._buffer if l.seq > seq]
+
+    def max_seq(self) -> int:
+        """Highest seq in the buffer, or -1 if empty."""
+        return self._buffer[-1].seq if self._buffer else -1
 
     def __len__(self) -> int:
         return len(self._buffer)

@@ -106,3 +106,4 @@ class LogsResponse(BaseModel):
 
     lines: list[LogLine]
     total_buffered: int
+    max_seq: int  # highest seq in the buffer; pass back as since_seq on next poll

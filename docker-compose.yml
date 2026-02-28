@@ -18,6 +18,7 @@ services:
       FUJ_PSU1_LOCAL_IP:    10.10.10.50
       FUJ_PSU2_IP:          10.10.20.137
       FUJ_PSU2_LOCAL_IP:    10.10.20.50
+      FUJ_API_HOST:         127.0.0.1
       FUJ_API_PORT:         "8000"
       FUJ_LOG_LEVEL:        INFO
     devices:

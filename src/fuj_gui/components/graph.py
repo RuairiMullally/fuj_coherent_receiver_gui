@@ -22,6 +22,7 @@ def build_graph_panel() -> dbc.Card:
         dbc.CardBody(
             dcc.Graph(
                 id="pi-mpd-graph",
+                figure=empty_figure(),
                 style={"height": "55vh", "minHeight": "350px"},
                 config={"displayModeBar": False},
             )

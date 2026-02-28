@@ -26,10 +26,21 @@ def get_logs(
         le=500,
         description="Number of recent log lines to return (max 500)",
     ),
+    since_seq: int = Query(
+        default=-1,
+        ge=-1,
+        description="Return only lines with seq > this value; -1 returns the last n lines",
+    ),
     log_buffer: LogBufferHandler = Depends(get_log_buffer),
 ) -> LogsResponse:
-    """Return the last n structured log lines from service and hardware loggers."""
+    """Return structured log lines from the in-memory ring buffer.
+
+    Pass since_seq from the previous response to receive only new lines (delta
+    polling). Omit or pass -1 to get the last n lines (initial load).
+    """
+    lines = log_buffer.since(since_seq) if since_seq >= 0 else log_buffer.recent(n)
     return LogsResponse(
-        lines=log_buffer.recent(n),
+        lines=lines,
         total_buffered=len(log_buffer),
+        max_seq=log_buffer.max_seq(),
     )

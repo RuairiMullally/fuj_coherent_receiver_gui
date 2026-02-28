@@ -176,10 +176,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # --- Trusted hosts (local deploy) ---
+    # --- Trusted hosts ---
+    # API is accessed only from the Dash server on the same machine, so
+    # localhost is all that is needed. The "*" wildcard that was here before
+    # defeated the middleware entirely — it has been removed.
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1", "0.0.0.0", "*"],
+        allowed_hosts=["localhost", "127.0.0.1"],
     )
 
     # --- Service exception handlers ---

@@ -26,5 +26,8 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+fuj_gui = ["assets/*"]
+
 [project.scripts]
 fuj-gui = "fuj_gui.app:main"

@@ -37,7 +37,8 @@ def create_app(settings: GUISettings | None = None) -> Dash:
 
     app = Dash(
         __name__,
-        external_stylesheets=[dbc.themes.DARKLY],
+        # Bootstrap Darkly theme is bundled in assets/bootstrap.darkly.min.css —
+        # no external_stylesheets needed; Dash auto-serves everything in assets/.
         title="FIM24725 Control",
         suppress_callback_exceptions=True,
     )
@@ -56,6 +57,14 @@ def _build_layout(settings: GUISettings) -> html.Div:
             dcc.Store(id="status-store", storage_type="memory"),
             dcc.Store(id="graph-store", storage_type="memory"),
             dcc.Store(id="mode-initialized-store", storage_type="memory", data=False),
+            # Graph settings passed to clientside callbacks (computed once from Python config)
+            dcc.Store(id="graph-settings-store", storage_type="memory", data={
+                "max_points": settings.graph_history_s * (1000 // settings.poll_interval_ms),
+                "window_s": settings.graph_history_s,
+            }),
+            # Accumulates log lines client-side; polled incrementally via since_seq
+            dcc.Store(id="log-store", storage_type="memory",
+                      data={"lines": [], "last_seq": -1}),
             dcc.Interval(
                 id="interval-status",
                 interval=settings.poll_interval_ms,

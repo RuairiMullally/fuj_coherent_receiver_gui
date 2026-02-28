@@ -101,7 +101,9 @@ A switch labelled **MGC**. Unchecked = AGC, checked = MGC.
 
 - Only enabled when state is `READY`.
 - Fires `POST /api/v1/mode` immediately on toggle.
-- The status store refreshes after the call.
+- On success the switch reflects the new mode immediately; the status store
+  refreshes on the next 500 ms poll. On error the switch reverts to the
+  previous server-confirmed mode.
 
 ### STARTUP / SHUTDOWN buttons
 
@@ -174,11 +176,27 @@ A Plotly time-series chart with five traces:
 - Before STARTUP the graph shows a *"Waiting for telemetry"* annotation; PI/MPD
   traces appear once the device reaches `READY` state.
 
+**Implementation note:** both the data-accumulation step (`graph-store` update)
+and the figure render are implemented as **clientside callbacks**
+(`assets/graph_callbacks.js`). Neither makes a network request — they execute
+entirely in the browser using data already present in `status-store`. This
+eliminates two Gunicorn round-trips per poll cycle.
+
 ---
 
 ## Log panel
 
-Polls `GET /api/v1/logs?n=100` every `log_poll_interval_ms` (default 2 s).
+Polls `GET /api/v1/logs` every `log_poll_interval_ms` (default 2 s) using
+**delta polling**: after the initial load (last 100 lines), each subsequent
+request passes `since_seq` so the server returns only new lines. Typical
+payload on a quiet system is 0–3 lines per tick.
+
+Received lines are **accumulated client-side** in `log-store` (up to 500 lines).
+The full history remains visible in the browser across poll cycles — scrolling
+up reveals older messages without any additional network request.
+
+A **Debug** toggle in the panel header shows or hides `DEBUG`-level lines.
+Filtering is applied locally from the stored lines; no re-fetch is needed.
 
 Lines are colour-coded by log level:
 
@@ -190,8 +208,10 @@ Lines are colour-coded by log level:
 | ERROR | Red |
 | CRITICAL | Red bold |
 
-The panel auto-scrolls to the bottom on each update. The full ISO timestamp is
-available as a tooltip on each line.
+The panel auto-scrolls to the bottom when new messages arrive **only if the
+user is already near the bottom** (within 50 px). Scrolling up to read history
+is not disrupted by incoming updates. The full ISO timestamp is available as a
+tooltip on each line.
 
 ---
 
@@ -199,20 +219,27 @@ available as a tooltip on each line.
 
 ```
 dcc.Interval (500ms)
-    └─→ GET /api/v1/status
+    └─→ GET /api/v1/status          [1 Gunicorn round-trip]
             └─→ status-store (dcc.Store)
-                    ├─→ header update  (badge, toggle, buttons)
-                    ├─→ controls update (placeholders, disabled state)
-                    └─→ graph-store append → pi-mpd-graph render
+                    ├─→ header update  (badge, toggle, buttons)  [server callback]
+                    ├─→ controls update (placeholders, disabled)  [server callback]
+                    └─→ graph-store append                         [clientside JS, 0 round-trips]
+                                └─→ pi-mpd-graph render            [clientside JS, 0 round-trips]
 
 dcc.Interval (2000ms)
-    └─→ GET /api/v1/logs
-            └─→ log-panel children
+    └─→ GET /api/v1/logs?since_seq=N  [delta only — 1 round-trip]
+            └─→ log-store append (dcc.Store, browser-side accumulation)
+                    └─→ log-panel render  [server callback, from store]
 ```
 
-All control actions (Set, mode toggle, startup, shutdown) also refresh
-`status-store` after the API call completes, so the header and placeholders
-update immediately without waiting for the next interval.
+Graph data accumulation and rendering run entirely in the browser
+(`assets/graph_callbacks.js`) with no additional round-trips beyond the status
+poll itself.
+
+Control actions (Set, mode toggle, startup, shutdown) do **not** issue a
+follow-up `GET /status` — the next 500 ms interval refreshes the store. The
+sole exception is startup and shutdown, which wait for the operation to
+complete (up to 20 s) before the callback returns.
 
 ---
 
@@ -222,12 +249,15 @@ update immediately without waiting for the next interval.
 src/fuj_gui/
 ├── app.py                    Dash factory, layout assembly, main() entry point
 ├── config.py                 GUISettings (pydantic-settings, FUJ_GUI_ prefix)
-├── api_client.py             Synchronous httpx wrapper; module-level singleton
+├── api_client.py             Persistent httpx session wrapper; module-level singleton
+├── assets/
+│   ├── bootstrap.darkly.min.css  Bootswatch Darkly theme (bundled — no CDN request)
+│   └── graph_callbacks.js    Clientside JS: graph-store accumulation + figure render
 ├── callbacks/
 │   ├── __init__.py           register_all(app, settings)
 │   ├── status.py             Status poll, header, controls, mode, startup/shutdown, SET
-│   ├── graph.py              graph-store accumulation + figure render
-│   └── logs.py               Log poll + clientside auto-scroll
+│   ├── graph.py              Registers clientside callbacks from graph_callbacks.js
+│   └── logs.py               Delta log poll → log-store; render from store; autoscroll
 └── components/
     ├── __init__.py           Public component exports
     ├── header.py             State badge, mode toggle, buttons, modals, toast
@@ -243,4 +273,4 @@ src/fuj_gui/
 - [REST API Documentation](rest_api.md)
 - [ADR-004: REST API Layer](adr/ADR-004-rest-api.md)
 - [Dash documentation](https://dash.plotly.com/)
-- [dash-bootstrap-components DARKLY theme](https://dash-bootstrap-components.opensource.faculty.ai/docs/themes/)
+- [dash-bootstrap-components](https://dash-bootstrap-components.opensource.faculty.ai/) — Bootswatch Darkly CSS bundled in `assets/` (no CDN)

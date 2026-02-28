@@ -48,7 +48,7 @@ def build_logs_panel() -> dbc.Card:
                         "backgroundColor": "#1e1e2e",
                         "padding": "8px",
                     },
-                    children=[html.Div(id="log-bottom", style={"height": "0"})],
+                    children=[],
                 ),
                 style={"padding": "0"},
             ),

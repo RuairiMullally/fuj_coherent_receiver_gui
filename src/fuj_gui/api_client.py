@@ -21,6 +21,9 @@ class APIClient:
     def __init__(self, base_url: str, timeout: float = 3.0) -> None:
         self._base = base_url.rstrip("/") + "/api/v1"
         self._timeout = timeout
+        # Persistent session: reuses the TCP connection across requests,
+        # avoiding a ~70ms DERP round-trip for the TCP handshake on every call.
+        self._session = httpx.Client()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -28,7 +31,7 @@ class APIClient:
 
     def _get(self, path: str, **params) -> dict:
         try:
-            r = httpx.get(f"{self._base}{path}", params=params, timeout=self._timeout)
+            r = self._session.get(f"{self._base}{path}", params=params, timeout=self._timeout)
             r.raise_for_status()
             return r.json()
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
@@ -36,7 +39,7 @@ class APIClient:
 
     def _post(self, path: str, body: dict | None = None, timeout: float | None = None) -> dict:
         try:
-            r = httpx.post(
+            r = self._session.post(
                 f"{self._base}{path}",
                 json=body,
                 timeout=timeout if timeout is not None else self._timeout,
@@ -85,8 +88,10 @@ class APIClient:
     # Logs
     # ------------------------------------------------------------------
 
-    def get_logs(self, n: int = 100) -> dict:
-        return self._get("/logs", n=n)
+    def get_logs(self, since_seq: int = -1) -> dict:
+        if since_seq >= 0:
+            return self._get("/logs", since_seq=since_seq)
+        return self._get("/logs", n=100)
 
 
 # ------------------------------------------------------------------
