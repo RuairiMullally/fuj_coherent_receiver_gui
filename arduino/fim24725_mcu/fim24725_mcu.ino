@@ -5,7 +5,8 @@
  * Runs on Arduino Uno R3 connected via USB serial (/dev/arduino on host).
  *
  * Pin assignments:
- *   D2  - SD (Shutdown):  HIGH = module disabled, LOW = module enabled
+ *   D2  - SD (Shutdown):  LOW = module disabled (SD active-low, FIM24725 SD pin LOW = shutdown enabled)
+ *                        HIGH = module enabled  (FIM24725 SD pin HIGH = shutdown disabled = running)
  *   D3  - MC/AGC (Mode):  HIGH = AGC,             LOW = MGC
  *   A0  - PI_XI  (Peak Indicator X-I)
  *   A1  - PI_XQ  (Peak Indicator X-Q)
@@ -16,8 +17,8 @@
  * Protocol (115200 baud, ASCII, \n-terminated):
  *   Host -> Arduino:
  *     PING          -> PONG
- *     SD:1          -> SD:1   (disable module, SD HIGH)
- *     SD:0          -> SD:0   (enable module, SD LOW)
+ *     SD:1          -> SD:1   (disable module, D2 LOW  → FIM24725 SD LOW  = shutdown active)
+ *     SD:0          -> SD:0   (enable module,  D2 HIGH → FIM24725 SD HIGH = shutdown inactive)
  *     MODE:AGC      -> MODE:AGC  (MC/AGC HIGH)
  *     MODE:MGC      -> MODE:MGC  (MC/AGC LOW)
  *     <unknown>     -> ERR:UNKNOWN:<cmd>
@@ -34,9 +35,9 @@
  * voltage = (analogRead(pin) / 1024.0) * 3.3
  * FIM24725 PI/MPD signals are 0-2V; they map to 0-61.6% of ADC range (~3.2 mV/count).
  *
- * NOTE: D2 and D3 are 5V Arduino outputs driving FIM24725 pins rated for 2-3.3V HIGH.
- * A voltage divider (e.g. 33k + 22k) on each output is recommended to keep logic
- * HIGH within the FIM24725 operating specification.
+ * NOTE: D2 and D3 are 5V Arduino outputs. FIM24725 pins require HIGH ≤ Vcc (3.465V max).
+ * Voltage dividers (33kΩ series + 22kΩ to GND) are fitted on both D2 and D3, giving
+ * 5V × 22/(33+22) = 2.0V — within the 2V–Vcc specification for SD-disable and AGC.
  */
 
 // ----- Pin definitions -----
@@ -97,16 +98,18 @@ static void processCommand(const String& cmd) {
         Serial.println("PONG");
 
     } else if (cmd == "SD:1") {
-        digitalWrite(PIN_SD, HIGH);
-        if (digitalRead(PIN_SD) != HIGH) {
+        // SD:1 = disable module → D2 LOW → FIM24725 SD LOW = shutdown active
+        digitalWrite(PIN_SD, LOW);
+        if (digitalRead(PIN_SD) != LOW) {
             Serial.println("ERR:PIN_FAULT:SD");
         } else {
             Serial.println("SD:1");
         }
 
     } else if (cmd == "SD:0") {
-        digitalWrite(PIN_SD, LOW);
-        if (digitalRead(PIN_SD) != LOW) {
+        // SD:0 = enable module → D2 HIGH → FIM24725 SD HIGH = shutdown inactive (running)
+        digitalWrite(PIN_SD, HIGH);
+        if (digitalRead(PIN_SD) != HIGH) {
             Serial.println("ERR:PIN_FAULT:SD");
         } else {
             Serial.println("SD:0");
@@ -130,7 +133,8 @@ static void processCommand(const String& cmd) {
 
     } else if (cmd == "HELLO") {
         // Re-assert safe state, respond with current state, then enable telemetry
-        digitalWrite(PIN_SD,   HIGH);
+        // D2 LOW → FIM24725 SD LOW = shutdown active = module off (safe)
+        digitalWrite(PIN_SD,   LOW);
         digitalWrite(PIN_MODE, HIGH);
         Serial.println("INIT:SD=1,MODE=AGC");
         tele_enabled = true;
@@ -156,8 +160,8 @@ void setup() {
     pinMode(PIN_SD,   OUTPUT);
     pinMode(PIN_MODE, OUTPUT);
 
-    // Safe initial state: module disabled (SD HIGH), AGC mode (MC/AGC HIGH)
-    digitalWrite(PIN_SD,   HIGH);
+    // Safe initial state: module disabled (D2 LOW → SD LOW = shutdown active), AGC mode (MC/AGC HIGH)
+    digitalWrite(PIN_SD,   LOW);
     digitalWrite(PIN_MODE, HIGH);
     // Host confirms connection via HELLO command; no autonomous INIT: broadcast needed
 }

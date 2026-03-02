@@ -26,7 +26,7 @@ class RailRegistry:
         ovp=3.600,              # ~9% above Vcc operating max (3.465V)
         ocp=0.700,              # Fault threshold: ~75% above 400mA typ, well above Iset
         verify_voltage=(3.135, 3.465),  # Datasheet Vcc operating range
-        verify_current=(0.280, 0.480),  # Datasheet Icc 360-400mA ±~20%
+        verify_current=(0.280, 0.420),  # Datasheet Icc max 400mA; upper bound = 400mA + 5%
     )
 
     VPD_5V0: ClassVar[RailConfig] = RailConfig(
@@ -79,9 +79,11 @@ class RailRegistry:
         name=RailName.OA_X,
         psu_name="PSU2",
         channel=3,
-        nominal_voltage=0.0,
+        nominal_voltage=0.500,  # Start at minimum; app notes OA range 0.5–2V in AGC mode
         nominal_current=0.020,
-        max_voltage=3.300,  # Range 0-VCC
+        min_voltage=0.000,      # 0V allowed for shutdown (datasheet step 2: controls to 0V);
+                                # 0.5V operational floor enforced by API OaRequest(ge=0.5)
+        max_voltage=2.000,      # App notes: OA max 2V (above this → clipped/max swing)
         ovp=3.600,
         ocp=0.020,
     )
@@ -90,9 +92,11 @@ class RailRegistry:
         name=RailName.OA_Y,
         psu_name="PSU2",
         channel=4,
-        nominal_voltage=0.0,
+        nominal_voltage=0.500,  # Start at minimum; app notes OA range 0.5–2V in AGC mode
         nominal_current=0.020,
-        max_voltage=3.300,  # Range 0-VCC
+        min_voltage=0.000,      # 0V allowed for shutdown (datasheet step 2: controls to 0V);
+                                # 0.5V operational floor enforced by API OaRequest(ge=0.5)
+        max_voltage=2.000,      # App notes: OA max 2V (above this → clipped/max swing)
         ovp=3.600,
         ocp=0.020,
     )

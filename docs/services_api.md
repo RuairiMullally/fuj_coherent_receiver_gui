@@ -119,8 +119,8 @@ class RailName(str, Enum):
     VOA_CTRL = "VOA_CTRL"    # Variable optical attenuator (0-4.8V)
     GA_X = "GA_X"            # Gain adjust X (0-3.3V)
     GA_Y = "GA_Y"            # Gain adjust Y (0-3.3V)
-    OA_X = "OA_X"            # Output amplitude X (0-3.3V)
-    OA_Y = "OA_Y"            # Output amplitude Y (0-3.3V)
+    OA_X = "OA_X"            # Output amplitude X (0.5-2V)
+    OA_Y = "OA_Y"            # Output amplitude Y (0.5-2V)
 ```
 
 ### `RailState`
@@ -204,9 +204,9 @@ Execute the full startup sequence:
 
 1. Verify safe initial state (SD=DISABLE, all off)
 2. Program OVP/OCP protections
-3. Enable VCC_3V3, verify 3.3V / 280-480mA (datasheet Icc 360-400mA ±20%)
-4. Enable VPD_5V0, verify 5.0V
-5. Set initial controls (GA/OA=0V, VOA=2.5V)
+3. Enable VPD_5V0, verify 5.0V (photodiode bias FIRST per app notes)
+4. Enable VCC_3V3, verify 3.3V / 280-480mA (amplifier supply SECOND per app notes)
+5. Set initial controls (GA=0V, OA=0.5V min, VOA=2.5V)
 6. Enable control rail outputs; confirm PSU1 (VOA_CTRL) and PSU2 (GA_X) responsive via VOUT? query
 7. Settling delay (500ms)
 8. Enable module output (SD=ENABLE)
@@ -229,8 +229,8 @@ Execute orderly shutdown sequence:
 
 1. SD = DISABLE
 2. Return controls to safe values
-3. Disable VPD_5V0
-4. Disable VCC_3V3
+3. Disable VCC_3V3 (amplifier supply FIRST per app notes)
+4. Disable VPD_5V0 (photodiode bias SECOND per app notes)
 5. Disable control rails
 
 Safe to call from any state. Does not raise on failure.
@@ -269,7 +269,7 @@ service.set_voa(2.4)  # Set VOA to 2.4V
 
 Set Output Amplitude X voltage.
 
-- **Range:** 0-3.3V (clamped)
+- **Range:** 0.5–2V (clamped; app notes AGC mode range)
 - **Effect:** Controls final output amplitude for X channel
 - **Note:** Does not affect noise profile
 
@@ -281,7 +281,7 @@ service.set_oa_x(1.65)
 
 Set Output Amplitude Y voltage.
 
-- **Range:** 0-3.3V (clamped)
+- **Range:** 0.5–2V (clamped; app notes AGC mode range)
 
 ```python
 service.set_oa_y(1.65)
@@ -426,10 +426,10 @@ print(RailRegistry.OA_RAILS)       # [OA_X, OA_Y]
 | VCC_3V3 | PSU1 | 1 | 3.300V | 3.300V | 3.600V | 0.700A |
 | VPD_5V0 | PSU1 | 2 | 5.000V | 5.000V | 5.500V | 0.150A |
 | VOA_CTRL | PSU1 | 3 | 2.500V | 4.800V | 5.000V | 0.100A |
-| GA_X | PSU2 | 1 | 0.0V | 3.300V | 3.600V | 0.020A |
-| GA_Y | PSU2 | 2 | 0.0V | 3.300V | 3.600V | 0.020A |
-| OA_X | PSU2 | 3 | 0.0V | 3.300V | 3.600V | 0.020A |
-| OA_Y | PSU2 | 4 | 0.0V | 3.300V | 3.600V | 0.020A |
+| GA_X | PSU2 | 1 | 0.000V | 3.300V | 3.600V | 0.020A |
+| GA_Y | PSU2 | 2 | 0.000V | 3.300V | 3.600V | 0.020A |
+| OA_X | PSU2 | 3 | 0.500V | 2.000V | 3.600V | 0.020A |
+| OA_Y | PSU2 | 4 | 0.500V | 2.000V | 3.600V | 0.020A |
 
 ---
 

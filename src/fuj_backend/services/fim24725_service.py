@@ -168,11 +168,20 @@ class FIM24725Service:
         except Exception as e:
             self._logger.error(f"MCU SD disable failed: {e}")
 
-        # Second priority: disable all rails
+        # Second priority: disable rails in safe order (VCC before VPD per app notes)
         try:
-            self._rails.disable_all_rails()
+            self._rails.disable_rail(RailName.VCC_3V3)  # amplifier supply OFF first
         except Exception as e:
-            self._logger.error(f"Rail disable failed: {e}")
+            self._logger.error(f"Emergency: VCC disable failed: {e}")
+        try:
+            self._rails.disable_rail(RailName.VPD_5V0)  # photodiode bias OFF second
+        except Exception as e:
+            self._logger.error(f"Emergency: VPD disable failed: {e}")
+        for rail in [RailName.VOA_CTRL, RailName.GA_X, RailName.GA_Y, RailName.OA_X, RailName.OA_Y]:
+            try:
+                self._rails.disable_rail(rail)
+            except Exception as e:
+                self._logger.error(f"Emergency: {rail.value} disable failed: {e}")
 
     # --- MCU error → fault helper ---
 
@@ -279,8 +288,8 @@ class FIM24725Service:
         0. Lock PSU front panel buttons
         1. Verify safe initial state
         2. Program protections and setpoints (OVP/OCP/Vset/Iset per config)
-        3. Enable VCC, verify
-        4. Enable VPD, verify
+        3. Enable VPD, verify  ← photodiode bias MUST come before amplifier supply
+        4. Enable VCC, verify
         5. Set initial control values
         6. Enable control rails
         7. Settling delay
@@ -312,11 +321,11 @@ class FIM24725Service:
             # Step 2: Program all protections (sets OVP/OCP/Vset/Iset per config)
             self._program_protections()
 
-            # Step 3: Enable VCC, verify
-            self._enable_vcc()
-
-            # Step 4: Enable VPD, verify
+            # Step 3: Enable VPD, verify (photodiode bias FIRST per app notes)
             self._enable_vpd()
+
+            # Step 4: Enable VCC, verify (amplifier supply SECOND per app notes)
+            self._enable_vcc()
 
             # Step 5: Set initial control values
             self._set_initial_controls()
@@ -370,7 +379,7 @@ class FIM24725Service:
 
     def _enable_vcc(self) -> None:
         """Enable VCC rail and verify."""
-        self._logger.info("Step 3: Enabling VCC_3V3")
+        self._logger.info("Step 4: Enabling VCC_3V3")
         self._rails.enable_rail(RailName.VCC_3V3)
         time.sleep(0.500)  # Brief settling
 
@@ -384,7 +393,7 @@ class FIM24725Service:
 
     def _enable_vpd(self) -> None:
         """Enable VPD rail and verify."""
-        self._logger.info("Step 4: Enabling VPD_5V0")
+        self._logger.info("Step 3: Enabling VPD_5V0")
         self._rails.enable_rail(RailName.VPD_5V0)
         time.sleep(0.500)  # 500ms settling for VPD_5V0
 
@@ -473,8 +482,8 @@ class FIM24725Service:
         Follows the shutdown algorithm:
         1. SD = DISABLE
         2. Return controls to safe values
-        3. Disable VPD
-        4. Disable VCC
+        3. Disable VCC  ← amplifier supply MUST go before photodiode bias
+        4. Disable VPD
         5. Disable control rails
 
         Safe to call from any state. Does not raise on failure.
@@ -493,6 +502,7 @@ class FIM24725Service:
                 self._logger.error(f"SD disable failed: {e}")
 
             # Step 2: Return controls to safe values
+            # Datasheet shutdown step 2: set all control terminals to 0V.
             self._logger.info("Step 2: Returning controls to safe values")
             try:
                 self._rails.set_voa(0.0)
@@ -503,19 +513,19 @@ class FIM24725Service:
             except Exception as e:
                 self._logger.error(f"Control reset failed: {e}")
 
-            # Step 3: Disable VPD
-            self._logger.info("Step 3: Disabling VPD_5V0")
-            try:
-                self._rails.disable_rail(RailName.VPD_5V0)
-            except Exception as e:
-                self._logger.error(f"VPD disable failed: {e}")
-
-            # Step 4: Disable VCC
-            self._logger.info("Step 4: Disabling VCC_3V3")
+            # Step 3: Disable VCC (amplifier supply FIRST per app notes)
+            self._logger.info("Step 3: Disabling VCC_3V3")
             try:
                 self._rails.disable_rail(RailName.VCC_3V3)
             except Exception as e:
                 self._logger.error(f"VCC disable failed: {e}")
+
+            # Step 4: Disable VPD (photodiode bias SECOND per app notes)
+            self._logger.info("Step 4: Disabling VPD_5V0")
+            try:
+                self._rails.disable_rail(RailName.VPD_5V0)
+            except Exception as e:
+                self._logger.error(f"VPD disable failed: {e}")
 
             # Step 5: Disable control rails
             self._logger.info("Step 5: Disabling control rails")
@@ -572,7 +582,7 @@ class FIM24725Service:
         Does not affect noise profile.
 
         Args:
-            volts: Target voltage, clamped to 0-3.3V
+            volts: Target voltage, clamped to 0.5–2V (app notes AGC mode range)
 
         Raises:
             StateError: If system not ready
@@ -593,7 +603,7 @@ class FIM24725Service:
         Does not affect noise profile.
 
         Args:
-            volts: Target voltage, clamped to 0-3.3V
+            volts: Target voltage, clamped to 0.5–2V (app notes AGC mode range)
 
         Raises:
             StateError: If system not ready
@@ -863,14 +873,14 @@ class FIM24725Service:
                 self._logger.error(f"Control reset failed: {e}")
 
             try:
-                self._rails.disable_rail(RailName.VPD_5V0)
-            except Exception as e:
-                self._logger.error(f"VPD disable failed: {e}")
-
-            try:
-                self._rails.disable_rail(RailName.VCC_3V3)
+                self._rails.disable_rail(RailName.VCC_3V3)  # amplifier supply FIRST
             except Exception as e:
                 self._logger.error(f"VCC disable failed: {e}")
+
+            try:
+                self._rails.disable_rail(RailName.VPD_5V0)  # photodiode bias SECOND
+            except Exception as e:
+                self._logger.error(f"VPD disable failed: {e}")
 
             for rail in RailRegistry.CONTROL_RAILS:
                 try:

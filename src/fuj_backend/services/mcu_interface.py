@@ -33,8 +33,8 @@ class MCUInterface(Protocol):
         """Set SD pin state. Returns actual SD state after setting.
 
         Args:
-            disable: True sets SD HIGH (module disabled/shutdown),
-                     False sets SD LOW (module enabled/active).
+            disable: True  → D2 LOW  → FIM24725 SD LOW  = shutdown active (module off).
+                     False → D2 HIGH → FIM24725 SD HIGH = shutdown inactive (module on).
 
         Returns:
             Actual SD state: True if disabled, False if enabled.
@@ -55,7 +55,7 @@ class MCUInterface(Protocol):
 
     @property
     def sd_disabled(self) -> bool:
-        """Current SD pin state. True = module disabled (HIGH)."""
+        """Current SD pin state. True = module disabled (D2 LOW, FIM24725 SD LOW = shutdown active)."""
         ...
 
     @property
@@ -106,7 +106,7 @@ class MockMCU:
     def set_shutdown(self, disable: bool) -> bool:
         """Set SD pin state (simulated). Returns actual state."""
         self._sd_disabled = disable
-        state = "DISABLE (HIGH)" if disable else "ENABLE (LOW)"
+        state = "DISABLE (D2 LOW → SD LOW)" if disable else "ENABLE (D2 HIGH → SD HIGH)"
         self._logger.info(f"SD -> {state}")
         return self._sd_disabled
 

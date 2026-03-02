@@ -251,7 +251,7 @@ class RailController:
         """Set Output Amplitude X.
 
         Args:
-            volts: Target voltage, clamped to 0-3.3V (0-VCC)
+            volts: Target voltage, clamped to 0.5–2V (app notes AGC mode range)
         """
         volts = self._clamp_and_validate(RailName.OA_X, volts)
         self._set_voltage_verified(RailName.OA_X, volts)
@@ -261,7 +261,7 @@ class RailController:
         """Set Output Amplitude Y.
 
         Args:
-            volts: Target voltage, clamped to 0-3.3V (0-VCC)
+            volts: Target voltage, clamped to 0.5–2V (app notes AGC mode range)
         """
         volts = self._clamp_and_validate(RailName.OA_Y, volts)
         self._set_voltage_verified(RailName.OA_Y, volts)

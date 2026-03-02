@@ -38,18 +38,20 @@ We will use an **OSEPP Arduino Uno R3** (FTDI FT232R, USB serial, `/dev/arduino`
 
 | Signal  | Arduino Pin | Direction | Logic                          |
 |---------|-------------|-----------|--------------------------------|
-| SD      | D2          | Output    | HIGH = module disabled (safe state) |
+| SD      | D2          | Output    | LOW = module disabled (D2 LOW → SD LOW = shutdown active) |
 | MC/AGC  | D3          | Output    | HIGH = AGC, LOW = MGC          |
-| PI_XI   | A0          | Input ADC | 0–2V signal, 5V AREF           |
+| PI_XI   | A0          | Input ADC | 0–2V signal, 3.3V AREF         |
 | PI_XQ   | A1          | Input ADC | 0–2V signal                    |
 | PI_YI   | A2          | Input ADC | 0–2V signal                    |
 | PI_YQ   | A3          | Input ADC | 0–2V signal                    |
 | MPD     | A4          | Input ADC | 0–2V signal                    |
 
-D2 and D3 are set `HIGH` (safe/disabled state) in `setup()` before enabling outputs, preventing glitches on the FIM24725 control pins at power-on.
+D2 is set `LOW` (module off) and D3 is set `HIGH` (AGC) in `setup()` before enabling outputs,
+preventing glitches on the FIM24725 control pins at power-on.
 
-ADC conversion: `voltage = (analogRead(pin) / 1024.0) * 5.0`
-Default AREF = VCC = 5V, giving ~4.9 mV/count over the 0–2V signal range.
+ADC conversion: `voltage = (analogRead(pin) / 1024.0) * 3.3`
+AREF is connected to the Arduino 3.3V pin (external reference), giving ~3.2 mV/count over
+the 0–2V signal range.
 
 ### 2. Serial Protocol
 
@@ -59,8 +61,8 @@ All messages are ASCII, `\n`-terminated, sent over 115200 baud.
 |----------------|----------------------------------------------------|---------------------------------------|
 | Host → Arduino | `PING`                                             | Connectivity check                    |
 | Arduino → Host | `PONG`                                             | Reply to PING                         |
-| Host → Arduino | `SD:1`                                             | Set SD HIGH (module disabled)         |
-| Host → Arduino | `SD:0`                                             | Set SD LOW (module enabled)           |
+| Host → Arduino | `SD:1`                                             | Set D2 LOW → SD LOW (module disabled) |
+| Host → Arduino | `SD:0`                                             | Set D2 HIGH → SD HIGH (module enabled)|
 | Arduino → Host | `SD:1` / `SD:0`                                    | Echo applied SD state                 |
 | Host → Arduino | `MODE:AGC`                                         | Set MC/AGC HIGH                       |
 | Host → Arduino | `MODE:MGC`                                         | Set MC/AGC LOW                        |
@@ -77,7 +79,7 @@ Command responses are always exactly one line. Telemetry lines are unsolicited a
 
 - **Non-blocking serial:** Characters are accumulated in a `String` buffer in `loop()`; dispatch occurs on `\n`. `readStringUntil()` is avoided as it blocks for the full timeout on each call.
 - **Periodic telemetry:** `millis()` comparison in `loop()` emits a `TELE:` line every 500ms without interrupts or blocking.
-- **Setup:** D2/D3 set to `HIGH` (safe state) before `pinMode(OUTPUT)` to avoid a brief LOW glitch. `INIT:SD=1,MODE=AGC` is emitted at the end of `setup()`.
+- **Setup:** D2 set to `LOW` (module off) and D3 set to `HIGH` (AGC) before `pinMode(OUTPUT)` to avoid a brief enable glitch on the FIM24725 SD pin. `INIT:SD=1,MODE=AGC` is emitted at the end of `setup()`.
 - **Pin readback verification:** After each `digitalWrite()`, `digitalRead()` verifies the pin state. A mismatch emits `ERR:PIN_FAULT:SD` or `ERR:PIN_FAULT:MODE` instead of the normal echo.
 - **Stateless:** No application state is kept between commands; all persistent state lives in `FIM24725Service` on the Pi.
 
@@ -88,7 +90,7 @@ Command responses are always exactly one line. Telemetry lines are unsolicited a
 **Construction and startup sequence:**
 
 1. Open `serial.Serial(port, 115200, timeout=0.1)` with short read timeout for non-blocking reader
-2. Sleep 2s (`BOOT_DELAY_S`) for Arduino reset-on-DTR to complete
+2. Sleep 1.5s for Arduino reset-on-DTR to complete
 3. Clear the input buffer (discards any partial startup noise)
 4. Start daemon background reader thread (`arduino-reader`)
 5. Wait for `_init_event` (set when `INIT:` line is received), up to `timeout` seconds
@@ -151,15 +153,15 @@ The Arduino is symlinked to `/dev/arduino` on the Pi via udev matching FTDI FT23
 
 ### Trade-offs
 
-- **DTR reset delay:** 2s boot delay on every `ArduinoMCU()` construction is unavoidable without hardware modification (100nF cap on RST line) — acceptable for a laboratory instrument
+- **DTR reset delay:** 1.5s boot delay on every `ArduinoMCU()` construction is unavoidable without hardware modification (100nF cap on RST line) — acceptable for a laboratory instrument
 - **Telemetry latency:** Readings are up to 500ms stale; not suitable for real-time closed-loop control
 - **USB single point of failure:** Serial disconnect is detected but not automatically recovered; the service faults and requires manual restart
-- **ADC precision:** 10-bit ADC over 5V gives ~4.9 mV/count; signals are 0–2V so only ~40% of range is used, effective resolution is ~6.4 mV over the signal range
+- **ADC precision:** 10-bit ADC over 3.3V (external AREF) gives ~3.2 mV/count; signals are 0–2V so ~61.6% of ADC range is used, effective resolution is ~3.2 mV over the signal range
 
 ### Risks Mitigated
 
 - **Wrong firmware:** `INIT:` handshake prevents operating with wrong/stale firmware or bare Arduino with no sketch
-- **Pin glitch on power-on:** D2/D3 pre-set HIGH before `pinMode(OUTPUT)` prevents a LOW glitch that would momentarily enable the FIM24725 during Arduino boot
+- **Pin glitch on power-on:** D2 pre-set LOW before `pinMode(OUTPUT)` prevents a HIGH glitch that would momentarily enable the FIM24725 during Arduino boot; D3 pre-set HIGH maintains AGC mode
 - **State drift:** Cached state (`_sd_disabled`, `_mode`) is initialised to match Arduino's startup state; properties always reflect either initial or last-commanded state
 
 ---

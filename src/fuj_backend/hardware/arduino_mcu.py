@@ -4,7 +4,8 @@ Controls FIM24725 digital signals via an OSEPP Arduino Uno R3 connected over
 USB serial (/dev/arduino on Raspberry Pi).
 
 Digital outputs (Arduino → FIM24725):
-  D2  SD (Shutdown):  HIGH = module disabled,  LOW = module enabled
+  D2  SD (Shutdown):  LOW  = module disabled (D2 LOW → FIM24725 SD LOW = shutdown active)
+                      HIGH = module enabled  (D2 HIGH → FIM24725 SD HIGH = shutdown inactive)
   D3  MC/AGC (Mode):  HIGH = AGC,              LOW = MGC
 
 Analog inputs (FIM24725 → Arduino ADC, 0–2V):
@@ -259,8 +260,8 @@ class ArduinoMCU:
         """Set SD pin state. Returns actual SD state after setting.
 
         Args:
-            disable: True sets SD HIGH (module disabled),
-                     False sets SD LOW (module enabled).
+            disable: True  → sends SD:1 → D2 LOW  → FIM24725 SD LOW  = shutdown active (module off).
+                     False → sends SD:0 → D2 HIGH → FIM24725 SD HIGH = shutdown inactive (module on).
 
         Returns:
             Actual SD state: True if disabled, False if enabled.
@@ -305,7 +306,7 @@ class ArduinoMCU:
 
     @property
     def sd_disabled(self) -> bool:
-        """Current SD pin state (cached). True = module disabled (HIGH)."""
+        """Current SD pin state (cached). True = module disabled (D2 LOW, FIM24725 SD LOW)."""
         return self._sd_disabled
 
     @property

@@ -31,8 +31,13 @@ class VoaRequest(BaseModel):
     voltage: Annotated[float, Field(ge=0.0, le=4.8)]
 
 
-class OaGaRequest(BaseModel):
-    """OA_X / OA_Y / GA_X / GA_Y voltage setpoint — clamped to 0–3.3 V."""
+class OaRequest(BaseModel):
+    """OA_X / OA_Y voltage setpoint — app notes AGC mode range 0.5–2 V."""
+    voltage: Annotated[float, Field(ge=0.5, le=2.0)]
+
+
+class GaRequest(BaseModel):
+    """GA_X / GA_Y voltage setpoint — range 0–Vcc (0–3.3 V)."""
     voltage: Annotated[float, Field(ge=0.0, le=3.3)]
 
 

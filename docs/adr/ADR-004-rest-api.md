@@ -142,11 +142,11 @@ service-layer models (`services/models.py`). This decoupling:
   string rather than `RailName` enum for clean JSON serialisation)
 
 Voltage control endpoints use endpoint-specific request models with Pydantic `Field`
-constraints: `VoaRequest` (0–4.8 V) for `/voa` and `OaGaRequest` (0–3.3 V) for the
-remaining control endpoints. FastAPI returns HTTP 422 with a descriptive message for
-any out-of-range value before the request reaches the service. The service layer's
-`RailController._clamp_and_validate()` clamps silently as a defence-in-depth backstop
-and emits a `WARNING` log if clamping occurs.
+constraints: `VoaRequest` (0–4.8 V) for `/voa`, `OaRequest` (0.5–2.0 V) for `/oa_x`
+and `/oa_y`, and `GaRequest` (0–3.3 V) for `/ga_x` and `/ga_y`. FastAPI returns HTTP
+422 with a descriptive message for any out-of-range value before the request reaches the
+service. The service layer's `RailController._clamp_and_validate()` clamps silently as a
+defence-in-depth backstop and emits a `WARNING` log if clamping occurs.
 
 ### 9. In-memory log buffer
 

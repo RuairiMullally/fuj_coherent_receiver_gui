@@ -156,8 +156,8 @@ Returns a full system snapshot. Safe to call in any state.
     "VOA_CTRL": { "voltage": 2.500, "current": 0.012, "state": "ENABLED", "mode": "CV" },
     "GA_X":    { "voltage": 0.000, "current": 0.000, "state": "ENABLED", "mode": "CV" },
     "GA_Y":    { "voltage": 0.000, "current": 0.000, "state": "ENABLED", "mode": "CV" },
-    "OA_X":    { "voltage": 0.000, "current": 0.000, "state": "ENABLED", "mode": "CV" },
-    "OA_Y":    { "voltage": 0.000, "current": 0.000, "state": "ENABLED", "mode": "CV" }
+    "OA_X":    { "voltage": 0.500, "current": 0.001, "state": "ENABLED", "mode": "CV" },
+    "OA_Y":    { "voltage": 0.500, "current": 0.001, "state": "ENABLED", "mode": "CV" }
   },
   "peak_indicators": {
     "pi_xi": 0.512, "pi_xq": 0.480, "pi_yi": 0.523, "pi_yq": 0.491
@@ -290,11 +290,11 @@ Set Variable Optical Attenuator control voltage.
 
 Set Output Amplitude X.
 
-**Request body (`OaGaRequest`)**
+**Request body (`OaRequest`)**
 
 | Field | Type | Range |
 |---|---|---|
-| `voltage` | `float` | 0.0 – 3.3 V |
+| `voltage` | `float` | 0.5 – 2.0 V |
 
 ---
 
@@ -308,7 +308,7 @@ Set Output Amplitude Y. Same request body and range as `oa_x`.
 
 Set Gain Adjust X.
 
-**Request body (`OaGaRequest`)**
+**Request body (`GaRequest`)**
 
 | Field | Type | Range |
 |---|---|---|
