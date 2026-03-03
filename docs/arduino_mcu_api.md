@@ -35,7 +35,7 @@ with ArduinoMCU("/dev/arduino") as mcu:
 
 | Signal  | Arduino Pin | Direction     | Logic                             | Voltage Range |
 |---------|-------------|---------------|-----------------------------------|---------------|
-| SD      | D2          | Digital out   | HIGH = module disabled (safe)     | 0 / 5V        |
+| SD      | D2          | Digital out   | LOW = module disabled (D2 LOW → SD LOW = shutdown active) | 0 / 5V |
 | MC/AGC  | D3          | Digital out   | HIGH = AGC, LOW = MGC             | 0 / 5V        |
 | PI_XI   | A0          | ADC input     | Peak Indicator X-I                | 0–2V          |
 | PI_XQ   | A1          | ADC input     | Peak Indicator X-Q                | 0–2V          |
@@ -43,11 +43,13 @@ with ArduinoMCU("/dev/arduino") as mcu:
 | PI_YQ   | A3          | ADC input     | Peak Indicator Y-Q                | 0–2V          |
 | MPD     | A4          | ADC input     | Monitor Photodiode                | 0–2V          |
 
-**Safe state:** D2 and D3 are set HIGH during `setup()` before enabling outputs. This
-ensures SD=disabled and MODE=AGC at all times during Arduino boot, with no glitch.
+**Safe state:** D2 is set LOW (module off) and D3 is set HIGH (AGC) during `setup()` before
+enabling outputs. This ensures SD=disabled and MODE=AGC at all times during Arduino boot,
+with no glitch.
 
-**ADC conversion:** `voltage = (analogRead(pin) / 1024.0) × 5.0`
-Default AREF = VCC = 5V. Gives ~4.9 mV/count; signals use ~40% of ADC range (0–2V).
+**ADC conversion:** `voltage = (analogRead(pin) / 1024.0) × 3.3`
+AREF is connected to the Arduino 3.3V pin (external reference). Gives ~3.2 mV/count;
+signals use ~61.6% of ADC range (0–2V out of 0–3.3V).
 
 ---
 
@@ -82,7 +84,7 @@ sends its `INIT:` startup message.
 **Startup sequence**
 
 1. Opens `serial.Serial(port, 115200, timeout=0.1)`
-2. Sleeps 2s for Arduino reset-on-DTR to complete
+2. Sleeps 1.5s for Arduino reset-on-DTR to complete
 3. Clears the input buffer
 4. Starts background reader thread (`arduino-reader`, daemon)
 5. Waits for `INIT:SD=1,MODE=AGC` from Arduino (up to `timeout` seconds)
@@ -93,7 +95,6 @@ sends its `INIT:` startup message.
 | Constant          | Value | Description |
 |-------------------|-------|-------------|
 | `BAUD`            | `115200` | Default baud rate |
-| `BOOT_DELAY_S`    | `2.0` | Seconds to wait after DTR reset |
 | `READ_TIMEOUT_S`  | `0.1` | `serial.readline()` timeout inside reader thread |
 
 ---
@@ -105,14 +106,14 @@ sends its `INIT:` startup message.
 Sets the SD (Shutdown) pin on the FIM24725.
 
 ```python
-mcu.set_shutdown(True)   # SD HIGH — module disabled (safe state)
-mcu.set_shutdown(False)  # SD LOW  — module enabled
+mcu.set_shutdown(True)   # D2 LOW → SD LOW  — module disabled (shutdown active, safe state)
+mcu.set_shutdown(False)  # D2 HIGH → SD HIGH — module enabled (shutdown inactive, running)
 ```
 
 Sends `SD:1` or `SD:0` to the Arduino. The Arduino applies the pin and verifies with
 `digitalRead()` before echoing the applied state. Updates the `sd_disabled` cache.
 
-**Returns:** `True` if SD is now HIGH (module disabled), `False` if LOW (enabled).
+**Returns:** `True` if module is now disabled (D2 LOW → SD LOW, shutdown active), `False` if enabled (D2 HIGH → SD HIGH, running).
 
 **Raises:** `MCUError` on communication failure, timeout, or `ERR:PIN_FAULT:SD` from Arduino.
 
@@ -203,9 +204,9 @@ Safe to call multiple times. Called automatically by `__exit__` when used as a c
 
 #### `sd_disabled: bool` (read-only)
 
-Cached SD pin state. `True` = SD HIGH (module disabled), `False` = SD LOW (module enabled).
+Cached SD state. `True` = D2 LOW, SD LOW (module disabled, shutdown active). `False` = D2 HIGH, SD HIGH (module enabled, running).
 
-Initialised to `True` at construction (matches Arduino `setup()` initial state). Updated by `set_shutdown()`.
+Initialised to `True` at construction (matches Arduino `setup()` initial state: D2 LOW, module off). Updated by `set_shutdown()`.
 
 ```python
 if mcu.sd_disabled:
@@ -273,8 +274,8 @@ All messages are ASCII, `\n`-terminated, 115200 baud, 8N1.
 | Command    | Effect                                    | Response (success)      | Response (fault)        |
 |------------|-------------------------------------------|-------------------------|-------------------------|
 | `PING`     | Connectivity check                        | `PONG`                  | —                       |
-| `SD:1`     | Set SD HIGH (module disabled)             | `SD:1`                  | `ERR:PIN_FAULT:SD`      |
-| `SD:0`     | Set SD LOW (module enabled)               | `SD:0`                  | `ERR:PIN_FAULT:SD`      |
+| `SD:1`     | Set D2 LOW → SD LOW (module disabled)     | `SD:1`                  | `ERR:PIN_FAULT:SD`      |
+| `SD:0`     | Set D2 HIGH → SD HIGH (module enabled)    | `SD:0`                  | `ERR:PIN_FAULT:SD`      |
 | `MODE:AGC` | Set MC/AGC HIGH (AGC mode)                | `MODE:AGC`              | `ERR:PIN_FAULT:MODE`    |
 | `MODE:MGC` | Set MC/AGC LOW (MGC mode)                 | `MODE:MGC`              | `ERR:PIN_FAULT:MODE`    |
 | *(unknown)*| —                                         | —                       | `ERR:UNKNOWN:<cmd>`     |
@@ -331,7 +332,7 @@ All serial traffic and internal events are logged via the `fim24725` logger hier
 
 ```
 INFO  fim24725.mcu.arduino  Connecting to Arduino on /dev/arduino at 115200 baud
-DEBUG fim24725.mcu.arduino  Waiting 2.0s for Arduino reset
+DEBUG fim24725.mcu.arduino  Waiting 1.5s for Arduino reset
 INFO  fim24725.mcu.arduino  Arduino startup: INIT:SD=1,MODE=AGC
 INFO  fim24725.mcu.arduino  Arduino connected and initialised
 DEBUG fim24725.mcu.arduino  TX: SD:0
@@ -460,7 +461,7 @@ python -c "import serial; print(serial.__version__)"  # should print e.g. 3.5
 
 ## Glossary
 
-- **SD:** Shutdown pin — `HIGH` disables the FIM24725 module; `LOW` enables it; active-low
+- **SD:** Shutdown pin — FIM24725 SD `LOW` = shutdown active (module off); SD `HIGH` = module running. Arduino D2 drives SD directly (no inverter): D2 `LOW` → SD `LOW` (disabled), D2 `HIGH` → SD `HIGH` (enabled)
 - **MC/AGC:** Mode Control / Automatic Gain Control pin — `HIGH` = AGC mode; `LOW` = MGC mode
 - **PI_XI/XQ/YI/YQ:** Peak Indicator voltages for X-polarisation I/Q and Y-polarisation I/Q channels (0–2V)
 - **MPD:** Monitor Photodiode voltage (0–2V)

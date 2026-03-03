@@ -5,17 +5,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy project files
 COPY pyproject.toml /app/
-COPY src/fuj_backend /app/src/fuj_backend
-COPY src/fuj_gui /app/src/fuj_gui
+COPY src/ /app/src/
 
-# Install dependencies
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir .
 
-# Expose API port
 EXPOSE 8000
 
-# Run the backend service
-CMD ["python", "-m", "uvicorn", "fuj_backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "fuj_backend.api.app:create_app", "--factory", \
+     "--host", "0.0.0.0", "--port", "8000"]

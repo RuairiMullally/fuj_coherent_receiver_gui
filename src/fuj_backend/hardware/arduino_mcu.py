@@ -4,7 +4,8 @@ Controls FIM24725 digital signals via an OSEPP Arduino Uno R3 connected over
 USB serial (/dev/arduino on Raspberry Pi).
 
 Digital outputs (Arduino → FIM24725):
-  D2  SD (Shutdown):  HIGH = module disabled,  LOW = module enabled
+  D2  SD (Shutdown):  LOW  = module disabled (D2 LOW → FIM24725 SD LOW = shutdown active)
+                      HIGH = module enabled  (D2 HIGH → FIM24725 SD HIGH = shutdown inactive)
   D3  MC/AGC (Mode):  HIGH = AGC,              LOW = MGC
 
 Analog inputs (FIM24725 → Arduino ADC, 0–2V):
@@ -12,7 +13,8 @@ Analog inputs (FIM24725 → Arduino ADC, 0–2V):
   A1  PI_XQ  (Peak Indicator X-Q)
   A2  PI_YI  (Peak Indicator Y-I)
   A3  PI_YQ  (Peak Indicator Y-Q)
-  A4  MPD    (Monitor Photodiode)
+  A4  MPD+   (Monitor Photodiode positive terminal)
+  A5  MPD-   (Monitor Photodiode negative terminal)
 
 The Arduino autonomously pushes a TELE: line every 500 ms.
 Commands are sent as ASCII lines; the Arduino echoes the applied state.
@@ -83,7 +85,8 @@ class ArduinoMCU:
 
         # Latest telemetry cache
         self._last_pi: Optional[PeakIndicators] = None
-        self._last_mpd: Optional[float] = None
+        self._last_mpd: Optional[float] = None    # differential: MPD+ - MPD-
+        self._last_mpd_n: Optional[float] = None  # MPD- raw
         self._tele_lock = threading.Lock()
 
         # Command response queue — reader thread deposits non-TELE lines here
@@ -202,7 +205,8 @@ class ArduinoMCU:
     def _parse_telemetry(self, payload: str) -> None:
         """Parse TELE payload and update internal cache.
 
-        Expected format: PI_XI=1.234,PI_XQ=0.876,PI_YI=1.543,PI_YQ=0.234,MPD=0.567
+        Expected format: PI_XI=1.234,PI_XQ=0.876,PI_YI=1.543,PI_YQ=0.234,MPD_P=0.567,MPD_N=0.123
+        MPD differential is computed as MPD+ - MPD-.
         """
         try:
             parts = dict(item.split("=") for item in payload.split(","))
@@ -212,10 +216,12 @@ class ArduinoMCU:
                 pi_yi=float(parts["PI_YI"]),
                 pi_yq=float(parts["PI_YQ"]),
             )
-            mpd = float(parts["MPD"])
+            mpd_p = float(parts["MPD_P"])
+            mpd_n = float(parts["MPD_N"])
             with self._tele_lock:
                 self._last_pi = pi
-                self._last_mpd = mpd
+                self._last_mpd = mpd_p - mpd_n  # differential
+                self._last_mpd_n = mpd_n
         except Exception as e:
             self._logger.warning(f"Telemetry parse error: {e} | payload: {payload!r}")
 
@@ -259,8 +265,8 @@ class ArduinoMCU:
         """Set SD pin state. Returns actual SD state after setting.
 
         Args:
-            disable: True sets SD HIGH (module disabled),
-                     False sets SD LOW (module enabled).
+            disable: True  → sends SD:1 → D2 LOW  → FIM24725 SD LOW  = shutdown active (module off).
+                     False → sends SD:0 → D2 HIGH → FIM24725 SD HIGH = shutdown inactive (module on).
 
         Returns:
             Actual SD state: True if disabled, False if enabled.
@@ -305,7 +311,7 @@ class ArduinoMCU:
 
     @property
     def sd_disabled(self) -> bool:
-        """Current SD pin state (cached). True = module disabled (HIGH)."""
+        """Current SD pin state (cached). True = module disabled (D2 LOW, FIM24725 SD LOW)."""
         return self._sd_disabled
 
     @property
@@ -329,10 +335,10 @@ class ArduinoMCU:
         return pi
 
     def read_mpd(self) -> float:
-        """Return latest MPD reading from telemetry cache.
+        """Return differential MPD reading (MPD+ - MPD-) from telemetry cache.
 
         Returns:
-            MPD voltage (0–2V, units TBD).
+            MPD differential voltage (MPD+ - MPD-).
 
         Raises:
             MCUError: If no telemetry has been received yet.
@@ -342,6 +348,21 @@ class ArduinoMCU:
         if mpd is None:
             raise MCUError("No telemetry received from Arduino yet")
         return mpd
+
+    def read_mpd_n(self) -> float:
+        """Return latest MPD- (negative terminal) raw reading from telemetry cache.
+
+        Returns:
+            MPD- voltage (0–2V).
+
+        Raises:
+            MCUError: If no telemetry has been received yet.
+        """
+        with self._tele_lock:
+            mpd_n = self._last_mpd_n
+        if mpd_n is None:
+            raise MCUError("No telemetry received from Arduino yet")
+        return mpd_n
 
     def is_connected(self) -> bool:
         """Check if Arduino is responsive by sending PING.

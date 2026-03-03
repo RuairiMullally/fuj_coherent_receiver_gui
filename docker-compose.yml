@@ -1,22 +1,56 @@
-version: '3.8'
-
 services:
-  backend:
+
+  # -----------------------------------------------------------------------
+  # FastAPI backend
+  # network_mode: host so the container can bind to the PSU-facing NICs
+  # (10.10.10.50 and 10.10.20.50) directly on the Pi's network stack.
+  # -----------------------------------------------------------------------
+  api:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: fuj_unified
-    ports:
-      - "8000:8000"
+    container_name: fuj_api
+    network_mode: host
     environment:
-      - DEBUG=false
-      - HARDWARE_MODE=simulator
+      FUJ_MCU_MODE:         real
+      FUJ_MCU_PORT:         /dev/arduino
+      FUJ_PSU1_IP:          10.10.10.137
+      FUJ_PSU1_LOCAL_IP:    10.10.10.50
+      FUJ_PSU2_IP:          10.10.20.137
+      FUJ_PSU2_LOCAL_IP:    10.10.20.50
+      FUJ_API_HOST:         127.0.0.1
+      FUJ_API_PORT:         "8000"
+      FUJ_LOG_LEVEL:        INFO
     devices:
       - /dev/arduino:/dev/arduino
+    volumes:
+      - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; r = httpx.get('http://localhost:8000/api/health'); exit(0 if r.status_code == 200 else 1)"]
-      interval: 30s
-      timeout: 10s
+      # /openapi.json is served by FastAPI without touching any hardware
+      test: ["CMD", "python", "-c",
+             "import httpx; r = httpx.get('http://localhost:8000/openapi.json', timeout=5); exit(0 if r.status_code == 200 else 1)"]
+      interval: 15s
+      timeout: 8s
       retries: 3
       start_period: 10s
+
+  # -----------------------------------------------------------------------
+  # Dash UI
+  # Also uses network_mode: host so it can reach the API on localhost:8000
+  # and expose port 8050 directly on the Pi.
+  # -----------------------------------------------------------------------
+  gui:
+    build:
+      context: .
+      dockerfile: Dockerfile.gui
+    container_name: fuj_gui
+    network_mode: host
+    environment:
+      FUJ_GUI_API_BASE_URL: http://localhost:8000
+      FUJ_GUI_GUI_HOST:     0.0.0.0
+      FUJ_GUI_GUI_PORT:     "8050"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

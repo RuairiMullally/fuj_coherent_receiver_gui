@@ -1,19 +1,20 @@
-2026-02-12 18:51:12.129 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=<PSU2_IP>:20002
-2026-02-12 18:51:12.129 | fim24725.service | INFO | === Starting FIM24725 Startup Sequence ===
-2026-02-12 18:51:12.130 | fim24725.state | INFO | State: OFF -> STARTING
-2026-02-12 18:51:12.130 | fim24725.service | INFO | Step 1: Ensuring safe initial state
-2026-02-12 18:51:12.130 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
-2026-02-12 18:51:12.130 | fim24725.mcu.mock | INFO | MC/AGC -> AGC (HIGH)
-2026-02-12 18:51:12.130 | fim24725.rails | INFO | VCC_3V3: Disabling
-2026-02-12 18:51:12.161 | fim24725.rails | INFO | VPD_5V0: Disabling
-2026-02-12 18:51:12.192 | fim24725.rails | INFO | VOA_CTRL: Disabling
-2026-02-12 18:51:12.222 | fim24725.rails | INFO | GA_X: Disabling
-2026-02-12 18:51:12.223 | fim24725.service | ERROR | Startup failed: [Errno -2] Name or service not known
-2026-02-12 18:51:12.223 | fim24725.state | ERROR | FAULT from STARTING: Startup failed: [Errno -2] Name or service not known
-2026-02-12 18:51:12.223 | fim24725.service | WARNING | Emergency shutdown triggered
-2026-02-12 18:51:12.223 | fim24725.mcu.mock | INFO | SD -> DISABLE (HIGH)
-2026-02-12 18:51:12.223 | fim24725.rails | INFO | VCC_3V3: Disabling
-2026-02-12 18:51:12.254 | fim24725.rails | INFO | VPD_5V0: Disabling
-2026-02-12 18:51:12.285 | fim24725.rails | INFO | VOA_CTRL: Disabling
-2026-02-12 18:51:12.316 | fim24725.rails | INFO | GA_X: Disabling
-2026-02-12 18:51:12.317 | fim24725.service | ERROR | Rail disable failed: [Errno -2] Name or service not known
+2026-02-25 23:06:48.250 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-02-25 23:07:22.050 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-02-25 23:07:49.878 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-02-25 23:07:49.879 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=10.10.20.137:20002
+2026-02-25 23:07:49.879 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-02-25 23:07:51.898 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-02-25 23:07:51.899 | fim24725.service | INFO | FIM24725Service closed
+2026-02-25 23:07:51.899 | fim24725.api | INFO | Shutdown complete
+2026-02-25 23:08:33.106 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-02-25 23:08:33.107 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=10.10.20.137:20002
+2026-02-25 23:08:33.107 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-02-25 23:08:33.117 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-02-25 23:08:33.117 | fim24725.service | INFO | FIM24725Service closed
+2026-02-25 23:08:33.117 | fim24725.api | INFO | Shutdown complete
+2026-02-25 23:08:54.381 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-02-25 23:08:54.381 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=10.10.20.137:20002
+2026-02-25 23:08:54.382 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-02-25 23:08:54.440 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-02-25 23:08:54.441 | fim24725.service | INFO | FIM24725Service closed
+2026-02-25 23:08:54.441 | fim24725.api | INFO | Shutdown complete

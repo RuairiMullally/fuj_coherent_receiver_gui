@@ -10,7 +10,8 @@ Signals controlled by MCU:
 
 Signals read by MCU:
 - PI (Peak indicators): Module -> MCU ADC (0-2V, 4 channels)
-- MPD (Monitor photodiode): Module -> MCU ADC
+- MPD+ (Monitor photodiode positive): Module -> MCU A4
+- MPD- (Monitor photodiode negative): Module -> MCU A5
 """
 
 from __future__ import annotations
@@ -33,8 +34,8 @@ class MCUInterface(Protocol):
         """Set SD pin state. Returns actual SD state after setting.
 
         Args:
-            disable: True sets SD HIGH (module disabled/shutdown),
-                     False sets SD LOW (module enabled/active).
+            disable: True  → D2 LOW  → FIM24725 SD LOW  = shutdown active (module off).
+                     False → D2 HIGH → FIM24725 SD HIGH = shutdown inactive (module on).
 
         Returns:
             Actual SD state: True if disabled, False if enabled.
@@ -55,7 +56,7 @@ class MCUInterface(Protocol):
 
     @property
     def sd_disabled(self) -> bool:
-        """Current SD pin state. True = module disabled (HIGH)."""
+        """Current SD pin state. True = module disabled (D2 LOW, FIM24725 SD LOW = shutdown active)."""
         ...
 
     @property
@@ -74,10 +75,18 @@ class MCUInterface(Protocol):
         ...
 
     def read_mpd(self) -> float:
-        """Read monitor photodiode value.
+        """Read differential monitor photodiode value (MPD+ - MPD-).
 
         Returns:
-            MPD voltage/current value (units TBD).
+            Differential MPD voltage (MPD+ - MPD-).
+        """
+        ...
+
+    def read_mpd_n(self) -> float:
+        """Read MPD- (negative terminal) raw value.
+
+        Returns:
+            MPD- voltage (0–2V).
         """
         ...
 
@@ -106,7 +115,7 @@ class MockMCU:
     def set_shutdown(self, disable: bool) -> bool:
         """Set SD pin state (simulated). Returns actual state."""
         self._sd_disabled = disable
-        state = "DISABLE (HIGH)" if disable else "ENABLE (LOW)"
+        state = "DISABLE (D2 LOW → SD LOW)" if disable else "ENABLE (D2 HIGH → SD HIGH)"
         self._logger.info(f"SD -> {state}")
         return self._sd_disabled
 
@@ -128,9 +137,14 @@ class MockMCU:
         )
 
     def read_mpd(self) -> float:
-        """Return random MPD value within valid range."""
-        self._logger.debug("Reading MPD (mock)")
+        """Return random differential MPD value (mock)."""
+        self._logger.debug("Reading MPD differential (mock)")
         return random.uniform(0.0, 1.0)
+
+    def read_mpd_n(self) -> float:
+        """Return random MPD- raw value (mock)."""
+        self._logger.debug("Reading MPD_N (mock)")
+        return random.uniform(0.0, 0.5)
 
     def is_connected(self) -> bool:
         """Return mock connection status."""

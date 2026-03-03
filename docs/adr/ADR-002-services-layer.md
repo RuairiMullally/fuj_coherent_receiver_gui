@@ -26,7 +26,7 @@ A higher-level abstraction is needed between the HAL and the application/GUI lay
 
 ### Key Constraints
 
-1. **Safety-critical sequencing**: VCC must be enabled before VPD; protections must be programmed before outputs enabled
+1. **Safety-critical sequencing**: VPD must be enabled before VCC (photodiode bias before amplifier supply — reverse order causes device damage); protections must be programmed before outputs enabled
 2. **Mode-dependent behavior**: GA writes always reach the PSU; the FIM24725 hardware ignores GA pins in AGC mode, enabling pre-staging of values before switching to MGC
 3. **Fault handling**: Any fault must immediately disable the module (SD = DISABLE)
 4. **MCU protocol TBD**: The Arduino communication interface is not yet determined

@@ -11,7 +11,9 @@ dependencies = [
     "httpx>=0.28.0",
     "dash>=2.18.0",
     "dash-bootstrap-components>=1.6.0",
-    "pyserial>=3.5"
+    "pyserial>=3.5",
+    "slowapi>=0.1.9",
+    "gunicorn>=21.0",
 ]
 
 [build-system]
@@ -23,3 +25,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+fuj_gui = ["assets/*"]
+
+[project.scripts]
+fuj-gui = "fuj_gui.app:main"

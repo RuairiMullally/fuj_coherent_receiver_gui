@@ -10,3 +10,6 @@ Requires-Dist: pydantic-settings>=2.6.0
 Requires-Dist: httpx>=0.28.0
 Requires-Dist: dash>=2.18.0
 Requires-Dist: dash-bootstrap-components>=1.6.0
+Requires-Dist: pyserial>=3.5
+Requires-Dist: slowapi>=0.1.9
+Requires-Dist: gunicorn>=21.0

@@ -168,11 +168,23 @@ class FIM24725Service:
         except Exception as e:
             self._logger.error(f"MCU SD disable failed: {e}")
 
-        # Second priority: disable all rails
+        # Datasheet power-down order: controls → VCC → VPD
+        # Step 2: Control rails to 0V first (avoids driving pins above VCC when VCC=0V)
+        for rail in [RailName.VOA_CTRL, RailName.GA_X, RailName.GA_Y, RailName.OA_X, RailName.OA_Y]:
+            try:
+                self._rails.disable_rail(rail)
+            except Exception as e:
+                self._logger.error(f"Emergency: {rail.value} disable failed: {e}")
+        # Step 3: VCC off (amplifier supply)
         try:
-            self._rails.disable_all_rails()
+            self._rails.disable_rail(RailName.VCC_3V3)
         except Exception as e:
-            self._logger.error(f"Rail disable failed: {e}")
+            self._logger.error(f"Emergency: VCC disable failed: {e}")
+        # Step 4: VPD off last (photodiode supply)
+        try:
+            self._rails.disable_rail(RailName.VPD_5V0)
+        except Exception as e:
+            self._logger.error(f"Emergency: VPD disable failed: {e}")
 
     # --- MCU error → fault helper ---
 
@@ -276,10 +288,11 @@ class FIM24725Service:
         Execute full startup sequence.
 
         Follows the bring-up algorithm:
+        0. Lock PSU front panel buttons
         1. Verify safe initial state
         2. Program protections and setpoints (OVP/OCP/Vset/Iset per config)
-        3. Enable VCC, verify
-        4. Enable VPD, verify
+        3. Enable VPD, verify  ← photodiode bias MUST come before amplifier supply
+        4. Enable VCC, verify
         5. Set initial control values
         6. Enable control rails
         7. Settling delay
@@ -301,17 +314,21 @@ class FIM24725Service:
         try:
             self._state.transition_to(SystemState.STARTING)
 
+            # Step 0: Lock PSU front panels (prevents accidental physical button presses)
+            self._logger.info("Step 0: Locking PSU front panels")
+            self._rails.lock_panels()
+
             # Step 1: Verify initial safe state
             self._ensure_safe_initial_state()
 
             # Step 2: Program all protections (sets OVP/OCP/Vset/Iset per config)
             self._program_protections()
 
-            # Step 3: Enable VCC, verify
-            self._enable_vcc()
-
-            # Step 4: Enable VPD, verify
+            # Step 3: Enable VPD, verify (photodiode bias FIRST per app notes)
             self._enable_vpd()
+
+            # Step 4: Enable VCC, verify (amplifier supply SECOND per app notes)
+            self._enable_vcc()
 
             # Step 5: Set initial control values
             self._set_initial_controls()
@@ -365,7 +382,7 @@ class FIM24725Service:
 
     def _enable_vcc(self) -> None:
         """Enable VCC rail and verify."""
-        self._logger.info("Step 3: Enabling VCC_3V3")
+        self._logger.info("Step 4: Enabling VCC_3V3")
         self._rails.enable_rail(RailName.VCC_3V3)
         time.sleep(0.500)  # Brief settling
 
@@ -379,7 +396,7 @@ class FIM24725Service:
 
     def _enable_vpd(self) -> None:
         """Enable VPD rail and verify."""
-        self._logger.info("Step 4: Enabling VPD_5V0")
+        self._logger.info("Step 3: Enabling VPD_5V0")
         self._rails.enable_rail(RailName.VPD_5V0)
         time.sleep(0.500)  # 500ms settling for VPD_5V0
 
@@ -441,7 +458,7 @@ class FIM24725Service:
         self._logger.info(f"Step 8: Enabling output (mode={mode.value})")
         self._set_mode_verified(mode)
         self._state.set_mode(mode)
-        self._set_sd_verified(False)  # SD = ENABLE (LOW)
+        self._set_sd_verified(False)  # SD = ENABLE → D2 HIGH → SD HIGH = shutdown disabled (module running)
 
     def _validate_peak_indicators(self) -> None:
         """Validate PI readings are not railed."""
@@ -465,12 +482,11 @@ class FIM24725Service:
         """
         Execute orderly shutdown sequence.
 
-        Follows the shutdown algorithm:
-        1. SD = DISABLE
-        2. Return controls to safe values
-        3. Disable VPD
-        4. Disable VCC
-        5. Disable control rails
+        Follows the datasheet power-down sequence:
+        1. SD = DISABLE (turn off optical/module output)
+        2. Disable control rails (GA, OA, VOA → 0V at FIM24725 pins)
+        3. Disable VCC_3V3 (amplifier supply off)
+        4. Disable VPD_5V0 (photodiode supply off — LAST)
 
         Safe to call from any state. Does not raise on failure.
         """
@@ -480,47 +496,45 @@ class FIM24725Service:
             if self._state.state not in (SystemState.OFF, SystemState.FAULT):
                 self._state.transition_to(SystemState.SHUTTING_DOWN)
 
-            # Step 1: SD = DISABLE
-            self._logger.info("Step 1: Disabling module output (SD=HIGH)")
+            # Step 1: SD = DISABLE (D2 LOW → FIM24725 SD LOW = shutdown active)
+            self._logger.info("Step 1: Disabling module output (D2 LOW → SD LOW = shutdown active)")
             try:
                 self._set_sd_verified(True)
             except Exception as e:
                 self._logger.error(f"SD disable failed: {e}")
 
-            # Step 2: Return controls to safe values
-            self._logger.info("Step 2: Returning controls to safe values")
-            try:
-                self._rails.set_voa(0.0)
-                self._rails.set_oa_x(0.0)
-                self._rails.set_oa_y(0.0)
-                self._rails.set_ga_x(0.0)
-                self._rails.set_ga_y(0.0)
-            except Exception as e:
-                self._logger.error(f"Control reset failed: {e}")
-
-            # Step 3: Disable VPD
-            self._logger.info("Step 3: Disabling VPD_5V0")
-            try:
-                self._rails.disable_rail(RailName.VPD_5V0)
-            except Exception as e:
-                self._logger.error(f"VPD disable failed: {e}")
-
-            # Step 4: Disable VCC
-            self._logger.info("Step 4: Disabling VCC_3V3")
-            try:
-                self._rails.disable_rail(RailName.VCC_3V3)
-            except Exception as e:
-                self._logger.error(f"VCC disable failed: {e}")
-
-            # Step 5: Disable control rails
-            self._logger.info("Step 5: Disabling control rails")
+            # Step 2: Disable control rails → 0V at FIM24725 pins (datasheet step 2)
+            # Must happen before VCC to avoid driving control pins above VCC (0V).
+            self._logger.info("Step 2: Disabling control rails (VOA, GA, OA → 0V)")
             for rail in RailRegistry.CONTROL_RAILS:
                 try:
                     self._rails.disable_rail(rail)
                 except Exception as e:
                     self._logger.error(f"{rail.value} disable failed: {e}")
 
+            # Step 3: Disable VCC_3V3 (amplifier supply — datasheet step 3)
+            self._logger.info("Step 3: Disabling VCC_3V3 (amplifier supply)")
+            try:
+                self._rails.disable_rail(RailName.VCC_3V3)
+            except Exception as e:
+                self._logger.error(f"VCC disable failed: {e}")
+
+            # Step 4: Disable VPD_5V0 (photodiode supply — datasheet step 4, LAST)
+            self._logger.info("Step 4: Disabling VPD_5V0 (photodiode supply, last)")
+            try:
+                self._rails.disable_rail(RailName.VPD_5V0)
+            except Exception as e:
+                self._logger.error(f"VPD disable failed: {e}")
+
             self._state.transition_to(SystemState.OFF)
+
+            # Step 6: Unlock PSU front panels
+            self._logger.info("Step 6: Unlocking PSU front panels")
+            try:
+                self._rails.unlock_panels()
+            except Exception as e:
+                self._logger.error(f"Panel unlock failed: {e}")
+
             self._logger.info("=== Shutdown Complete ===")
 
         except Exception as e:
@@ -559,7 +573,7 @@ class FIM24725Service:
         Does not affect noise profile.
 
         Args:
-            volts: Target voltage, clamped to 0-3.3V
+            volts: Target voltage, clamped to 0.5–2V (app notes AGC mode range)
 
         Raises:
             StateError: If system not ready
@@ -580,7 +594,7 @@ class FIM24725Service:
         Does not affect noise profile.
 
         Args:
-            volts: Target voltage, clamped to 0-3.3V
+            volts: Target voltage, clamped to 0.5–2V (app notes AGC mode range)
 
         Raises:
             StateError: If system not ready
@@ -685,21 +699,29 @@ class FIM24725Service:
         """
         pi = None
         mpd = None
+        rails: dict = {}
 
+        mpd_n = None
         if self._state.state == SystemState.READY:
             try:
                 pi = self._mcu.read_peak_indicators()
                 mpd = self._mcu.read_mpd()
+                mpd_n = self._mcu.read_mpd_n()
             except Exception as e:
                 self._logger.warning(f"MCU read failed: {e}")
+            try:
+                rails = self._rails.measure_all_rails()
+            except Exception as e:
+                self._logger.warning(f"Rail measurement failed: {e}")
 
         return SystemSnapshot(
             state=self._state.state,
             mode=self._state.mode,
-            rails=self._rails.measure_all_rails(),
+            rails=rails,
             sd_enabled=(self._state.state == SystemState.READY),
             peak_indicators=pi,
             mpd_value=mpd,
+            mpd_n_value=mpd_n,
             fault_message=(
                 self._state.fault_info.message if self._state.fault_info else None
             ),
@@ -728,13 +750,13 @@ class FIM24725Service:
     @synchronized
     def read_mpd(self) -> float:
         """
-        Read monitor photodiode value.
+        Read differential monitor photodiode value (MPD+ - MPD-).
 
         MPD measures optical input power independent of gain settings.
         MPD = optical reality, PI = electrical state.
 
         Returns:
-            MPD reading value
+            Differential MPD value (MPD+ - MPD-)
 
         Raises:
             MCUError: If MCU communication fails (also triggers fault + shutdown)
@@ -743,6 +765,23 @@ class FIM24725Service:
             return self._mcu.read_mpd()
         except MCUError as e:
             self._fault_on_mcu_error("read_mpd", e)
+            raise
+
+    @synchronized
+    def read_mpd_n(self) -> float:
+        """
+        Read MPD- (negative terminal) raw value.
+
+        Returns:
+            MPD- voltage (0–2V)
+
+        Raises:
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
+        """
+        try:
+            return self._mcu.read_mpd_n()
+        except MCUError as e:
+            self._fault_on_mcu_error("read_mpd_n", e)
             raise
 
     # --- Advanced Operations ---
@@ -830,37 +869,39 @@ class FIM24725Service:
             if self._state.state not in (SystemState.OFF, SystemState.FAULT):
                 self._state.transition_to(SystemState.SHUTTING_DOWN)
 
+            # Step 1: SD = DISABLE (D2 LOW → FIM24725 SD LOW = shutdown active)
             try:
                 self._set_sd_verified(True)
             except Exception as e:
                 self._logger.error(f"SD disable failed: {e}")
 
-            try:
-                self._rails.set_voa(0.0)
-                self._rails.set_oa_x(0.0)
-                self._rails.set_oa_y(0.0)
-                self._rails.set_ga_x(0.0)
-                self._rails.set_ga_y(0.0)
-            except Exception as e:
-                self._logger.error(f"Control reset failed: {e}")
-
-            try:
-                self._rails.disable_rail(RailName.VPD_5V0)
-            except Exception as e:
-                self._logger.error(f"VPD disable failed: {e}")
-
-            try:
-                self._rails.disable_rail(RailName.VCC_3V3)
-            except Exception as e:
-                self._logger.error(f"VCC disable failed: {e}")
-
+            # Step 2: Disable control rails → 0V at FIM24725 pins (datasheet step 2)
+            # Must happen before VCC to avoid driving control pins above VCC (0V).
             for rail in RailRegistry.CONTROL_RAILS:
                 try:
                     self._rails.disable_rail(rail)
                 except Exception as e:
                     self._logger.error(f"{rail.value} disable failed: {e}")
 
+            # Step 3: Disable VCC_3V3 (amplifier supply — datasheet step 3)
+            try:
+                self._rails.disable_rail(RailName.VCC_3V3)
+            except Exception as e:
+                self._logger.error(f"VCC disable failed: {e}")
+
+            # Step 4: Disable VPD_5V0 (photodiode supply — datasheet step 4, LAST)
+            try:
+                self._rails.disable_rail(RailName.VPD_5V0)
+            except Exception as e:
+                self._logger.error(f"VPD disable failed: {e}")
+
             self._state.transition_to(SystemState.OFF)
+
+            try:
+                self._rails.unlock_panels()
+            except Exception as e:
+                self._logger.error(f"Panel unlock failed: {e}")
+
             self._logger.info("=== Shutdown Complete ===")
 
         except Exception as e:
