@@ -61,10 +61,10 @@ FUJ_GUI_DEBUG=true
 │        0.0 – 4.8 V        │   5-trace time-series plot      │
 │                           │   PI_XI  PI_XQ  PI_YI  PI_YQ   │
 │  OA_X  [ 1.650 ] [Set]    │   MPD                           │
-│        0.0 – 3.3 V        │   Rolling 60-second window      │
+│        0.5 – 2.0 V        │   Rolling 60-second window      │
 │                           │                                 │
 │  OA_Y  [ 1.650 ] [Set]    │                                 │
-│        0.0 – 3.3 V        │                                 │
+│        0.5 – 2.0 V        │                                 │
 │                           │                                 │
 │  GA_X  [ 1.000 ] [Set]    │                                 │
 │        0.0 – 3.3 V        │                                 │
@@ -130,8 +130,8 @@ One row per controllable output:
 | Rail | Input ID | Range |
 |---|---|---|
 | VOA | `input-voa` | 0.0 – 4.8 V |
-| OA_X | `input-oa-x` | 0.0 – 3.3 V |
-| OA_Y | `input-oa-y` | 0.0 – 3.3 V |
+| OA_X | `input-oa-x` | 0.5 – 2.0 V |
+| OA_Y | `input-oa-y` | 0.5 – 2.0 V |
 | GA_X | `input-ga-x` | 0.0 – 3.3 V |
 | GA_Y | `input-ga-y` | 0.0 – 3.3 V |
 
