@@ -23,6 +23,7 @@ window.dash_clientside.graph_callbacks = {
 
         var pi = status_data.peak_indicators || {};
         var mpd_value = status_data.mpd_value;
+        var mpd_n_value = status_data.mpd_n_value;
 
         // Skip when there is no real telemetry (system not READY)
         var has_pi = pi && typeof pi === "object" && Object.keys(pi).length > 0;
@@ -33,7 +34,10 @@ window.dash_clientside.graph_callbacks = {
         // Clone to avoid mutating the frozen store reference
         graph_data = graph_data
             ? JSON.parse(JSON.stringify(graph_data))
-            : { t: [], pi_xi: [], pi_xq: [], pi_yi: [], pi_yq: [], mpd: [] };
+            : { t: [], pi_xi: [], pi_xq: [], pi_yi: [], pi_yq: [], mpd: [], mpd_n: [] };
+
+        // Ensure mpd_n exists for stores initialised before this field was added
+        if (!graph_data.mpd_n) graph_data.mpd_n = new Array(graph_data.t.length).fill(null);
 
         graph_data.t.push(new Date().toISOString());
         graph_data.pi_xi.push(pi.pi_xi !== undefined ? pi.pi_xi : null);
@@ -41,6 +45,7 @@ window.dash_clientside.graph_callbacks = {
         graph_data.pi_yi.push(pi.pi_yi !== undefined ? pi.pi_yi : null);
         graph_data.pi_yq.push(pi.pi_yq !== undefined ? pi.pi_yq : null);
         graph_data.mpd.push(mpd_value !== undefined ? mpd_value : null);
+        graph_data.mpd_n.push(mpd_n_value !== undefined ? mpd_n_value : null);
 
         var max_points = settings.max_points;
         if (graph_data.t.length > max_points) {
@@ -68,14 +73,15 @@ window.dash_clientside.graph_callbacks = {
             pi_xq: "#90e0ef",
             pi_yi: "#f77f00",
             pi_yq: "#fcbf49",
-            mpd:   "#a8dadc"
+            mpd:   "#a8dadc",
+            mpd_n: "#c9b1ff"
         };
         if (!graph_data || !graph_data.t || graph_data.t.length === 0) {
             return window.dash_clientside.no_update;
         }
         if (!settings) return window.dash_clientside.no_update;
 
-        var keys = ["pi_xi", "pi_xq", "pi_yi", "pi_yq", "mpd"];
+        var keys = ["pi_xi", "pi_xq", "pi_yi", "pi_yq", "mpd", "mpd_n"];
         var traces = keys.map(function (key) {
             return {
                 x:    graph_data.t,

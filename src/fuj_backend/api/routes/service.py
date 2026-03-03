@@ -57,6 +57,7 @@ def _build_status(service: FIM24725Service) -> ServiceStatusResponse:
         rails=rails_out,
         peak_indicators=pi_out,
         mpd_value=snap.mpd_value,
+        mpd_n_value=snap.mpd_n_value,
         fault=fault_out,
     )
 

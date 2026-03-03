@@ -11,7 +11,8 @@ graph-store format (maintained by update_graph_store):
         "pi_xq":  [0.480, ...],
         "pi_yi":  [0.523, ...],
         "pi_yq":  [0.491, ...],
-        "mpd":    [0.823, ...],
+        "mpd":    [0.823, ...],  # differential: MPD+ - MPD-
+        "mpd_n":  [0.234, ...],  # MPD- raw
     }
 
 graph-settings-store (initialised once in app.py from GUISettings):

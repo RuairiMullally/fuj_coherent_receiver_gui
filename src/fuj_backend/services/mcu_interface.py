@@ -10,7 +10,8 @@ Signals controlled by MCU:
 
 Signals read by MCU:
 - PI (Peak indicators): Module -> MCU ADC (0-2V, 4 channels)
-- MPD (Monitor photodiode): Module -> MCU ADC
+- MPD+ (Monitor photodiode positive): Module -> MCU A4
+- MPD- (Monitor photodiode negative): Module -> MCU A5
 """
 
 from __future__ import annotations
@@ -74,10 +75,18 @@ class MCUInterface(Protocol):
         ...
 
     def read_mpd(self) -> float:
-        """Read monitor photodiode value.
+        """Read differential monitor photodiode value (MPD+ - MPD-).
 
         Returns:
-            MPD voltage/current value (units TBD).
+            Differential MPD voltage (MPD+ - MPD-).
+        """
+        ...
+
+    def read_mpd_n(self) -> float:
+        """Read MPD- (negative terminal) raw value.
+
+        Returns:
+            MPD- voltage (0–2V).
         """
         ...
 
@@ -128,9 +137,14 @@ class MockMCU:
         )
 
     def read_mpd(self) -> float:
-        """Return random MPD value within valid range."""
-        self._logger.debug("Reading MPD (mock)")
+        """Return random differential MPD value (mock)."""
+        self._logger.debug("Reading MPD differential (mock)")
         return random.uniform(0.0, 1.0)
+
+    def read_mpd_n(self) -> float:
+        """Return random MPD- raw value (mock)."""
+        self._logger.debug("Reading MPD_N (mock)")
+        return random.uniform(0.0, 0.5)
 
     def is_connected(self) -> bool:
         """Return mock connection status."""

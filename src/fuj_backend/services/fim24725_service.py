@@ -710,10 +710,12 @@ class FIM24725Service:
         mpd = None
         rails: dict = {}
 
+        mpd_n = None
         if self._state.state == SystemState.READY:
             try:
                 pi = self._mcu.read_peak_indicators()
                 mpd = self._mcu.read_mpd()
+                mpd_n = self._mcu.read_mpd_n()
             except Exception as e:
                 self._logger.warning(f"MCU read failed: {e}")
             try:
@@ -728,6 +730,7 @@ class FIM24725Service:
             sd_enabled=(self._state.state == SystemState.READY),
             peak_indicators=pi,
             mpd_value=mpd,
+            mpd_n_value=mpd_n,
             fault_message=(
                 self._state.fault_info.message if self._state.fault_info else None
             ),
@@ -756,13 +759,13 @@ class FIM24725Service:
     @synchronized
     def read_mpd(self) -> float:
         """
-        Read monitor photodiode value.
+        Read differential monitor photodiode value (MPD+ - MPD-).
 
         MPD measures optical input power independent of gain settings.
         MPD = optical reality, PI = electrical state.
 
         Returns:
-            MPD reading value
+            Differential MPD value (MPD+ - MPD-)
 
         Raises:
             MCUError: If MCU communication fails (also triggers fault + shutdown)
@@ -771,6 +774,23 @@ class FIM24725Service:
             return self._mcu.read_mpd()
         except MCUError as e:
             self._fault_on_mcu_error("read_mpd", e)
+            raise
+
+    @synchronized
+    def read_mpd_n(self) -> float:
+        """
+        Read MPD- (negative terminal) raw value.
+
+        Returns:
+            MPD- voltage (0–2V)
+
+        Raises:
+            MCUError: If MCU communication fails (also triggers fault + shutdown)
+        """
+        try:
+            return self._mcu.read_mpd_n()
+        except MCUError as e:
+            self._fault_on_mcu_error("read_mpd_n", e)
             raise
 
     # --- Advanced Operations ---

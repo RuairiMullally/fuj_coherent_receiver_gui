@@ -90,7 +90,8 @@ class ServiceStatusResponse(BaseModel):
     sd_enabled: bool
     rails: dict[str, RailMeasurementOut]  # keyed by RailName.value
     peak_indicators: Optional[PeakIndicatorsOut] = None
-    mpd_value: Optional[float] = None
+    mpd_value: Optional[float] = None    # differential: MPD+ - MPD-
+    mpd_n_value: Optional[float] = None  # MPD- raw
     fault: Optional[FaultOut] = None
 
 

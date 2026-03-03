@@ -12,6 +12,7 @@ TRACE_COLORS = {
     "pi_yi": "#f77f00",
     "pi_yq": "#fcbf49",
     "mpd":   "#a8dadc",
+    "mpd_n": "#c9b1ff",
 }
 
 _BG = "#1e1e2e"

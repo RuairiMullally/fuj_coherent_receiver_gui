@@ -88,7 +88,8 @@ class SystemSnapshot(BaseModel):
     rails: dict[RailName, RailMeasurement]
     sd_enabled: bool
     peak_indicators: Optional[PeakIndicators] = None
-    mpd_value: Optional[float] = None
+    mpd_value: Optional[float] = None    # differential: MPD+ - MPD-
+    mpd_n_value: Optional[float] = None  # MPD- raw
     fault_message: Optional[str] = None
 
 

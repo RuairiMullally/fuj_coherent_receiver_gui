@@ -8,8 +8,8 @@ from dash import dcc, html
 _CONTROLS = [
     # (label, id_suffix, min, max, hint, is_ga)
     ("VOA",   "voa",   0.0, 4.8, "0.0 – 4.8 V", False),
-    ("OA_X",  "oa-x",  0.0, 3.3, "0.0 – 3.3 V", False),
-    ("OA_Y",  "oa-y",  0.0, 3.3, "0.0 – 3.3 V", False),
+    ("OA_X",  "oa-x",  0.5, 2.0, "0.5 – 2.0 V", False),
+    ("OA_Y",  "oa-y",  0.5, 2.0, "0.5 – 2.0 V", False),
     ("GA_X",  "ga-x",  0.0, 3.3, "0.0 – 3.3 V", True),
     ("GA_Y",  "ga-y",  0.0, 3.3, "0.0 – 3.3 V", True),
 ]

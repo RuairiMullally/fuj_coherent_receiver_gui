@@ -12,7 +12,8 @@
  *   A1  - PI_XQ  (Peak Indicator X-Q)
  *   A2  - PI_YI  (Peak Indicator Y-I)
  *   A3  - PI_YQ  (Peak Indicator Y-Q)
- *   A4  - MPD    (Monitor Photodiode)
+ *   A4  - MPD+   (Monitor Photodiode positive terminal)
+ *   A5  - MPD-   (Monitor Photodiode negative terminal)
  *
  * Protocol (115200 baud, ASCII, \n-terminated):
  *   Host -> Arduino:
@@ -29,7 +30,7 @@
  *
  *   Arduino -> Host (telemetry, every 500ms, unsolicited):
  *     INIT:SD=1,MODE=AGC   -- emitted once on startup
- *     TELE:PI_XI=x.xxx,PI_XQ=x.xxx,PI_YI=x.xxx,PI_YQ=x.xxx,MPD=x.xxx
+ *     TELE:PI_XI=x.xxx,PI_XQ=x.xxx,PI_YI=x.xxx,PI_YQ=x.xxx,MPD_P=x.xxx,MPD_N=x.xxx
  *
  * ADC: AREF pin connected to Arduino 3.3V pin (analogReference(EXTERNAL)).
  * voltage = (analogRead(pin) / 1024.0) * 3.3
@@ -48,7 +49,8 @@ static const int ADC_PI_XI = A0;
 static const int ADC_PI_XQ = A1;
 static const int ADC_PI_YI = A2;
 static const int ADC_PI_YQ = A3;
-static const int ADC_MPD   = A4;
+static const int ADC_MPD_P = A4;
+static const int ADC_MPD_N = A5;
 
 // ----- Telemetry interval -----
 static const unsigned long TELE_INTERVAL_MS = 500UL;
@@ -78,14 +80,16 @@ static void sendTelemetry() {
     float pi_xq = adcToVolts(analogRead(ADC_PI_XQ));
     float pi_yi = adcToVolts(analogRead(ADC_PI_YI));
     float pi_yq = adcToVolts(analogRead(ADC_PI_YQ));
-    float mpd   = adcToVolts(analogRead(ADC_MPD));
+    float mpd_p = adcToVolts(analogRead(ADC_MPD_P));
+    float mpd_n = adcToVolts(analogRead(ADC_MPD_N));
 
     Serial.print("TELE:");
-    Serial.print("PI_XI="); Serial.print(pi_xi, 3);
+    Serial.print("PI_XI=");  Serial.print(pi_xi, 3);
     Serial.print(",PI_XQ="); Serial.print(pi_xq, 3);
     Serial.print(",PI_YI="); Serial.print(pi_yi, 3);
     Serial.print(",PI_YQ="); Serial.print(pi_yq, 3);
-    Serial.print(",MPD=");   Serial.println(mpd, 3);
+    Serial.print(",MPD_P="); Serial.print(mpd_p, 3);
+    Serial.print(",MPD_N="); Serial.println(mpd_n, 3);
 }
 
 

@@ -37,5 +37,8 @@ def get_mpd(
     request: Request,
     service: FIM24725Service = Depends(get_service),
 ) -> dict[str, float]:
-    """Read the monitor photodiode value from the MCU ADC."""
-    return {"mpd": service.read_mpd()}
+    """Read monitor photodiode values from the MCU ADC.
+
+    Returns mpd (differential: MPD+ - MPD-) and mpd_n (MPD- raw).
+    """
+    return {"mpd": service.read_mpd(), "mpd_n": service.read_mpd_n()}
