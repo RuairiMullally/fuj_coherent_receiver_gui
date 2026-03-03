@@ -228,10 +228,9 @@ service.startup(OperatingMode.MGC)     # Start in MGC mode
 Execute orderly shutdown sequence:
 
 1. SD = DISABLE
-2. Return controls to safe values
-3. Disable VCC_3V3 (amplifier supply FIRST per app notes)
-4. Disable VPD_5V0 (photodiode bias SECOND per app notes)
-5. Disable control rails
+2. Disable control rails (VOA, GA, OA → 0V at FIM24725 pins)
+3. Disable VCC_3V3 (amplifier supply)
+4. Disable VPD_5V0 (photodiode supply — last)
 
 Safe to call from any state. Does not raise on failure.
 
