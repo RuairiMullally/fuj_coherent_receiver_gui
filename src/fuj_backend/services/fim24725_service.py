@@ -116,7 +116,7 @@ class FIM24725Service:
         # Initialize logger first (ensures file handler is set up)
         self._logger = get_service_logger().getChild("service")
 
-        # Thread safety: RLock allows reentrant calls (e.g., shutdown -> _emergency_shutdown)
+        # Thread safety: RLock allows reentrant calls (e.g., shutdown -> _assert_sd_disable)
         self._lock = threading.RLock()
 
         # Initialize HAL connections
@@ -134,7 +134,7 @@ class FIM24725Service:
         self._state = StateMachine()
         self._mcu = mcu or MockMCU()
 
-        # Register fault callback to trigger emergency shutdown
+        # Register fault callback to assert SD disable on fault
         self._state.add_state_callback(self._on_state_change)
 
         self._logger.info(
@@ -150,41 +150,27 @@ class FIM24725Service:
         Note: Called while _lock is held (from state machine operations).
         """
         if new_state == SystemState.FAULT:
-            self._emergency_shutdown_unlocked()
+            self._assert_sd_disable_unlocked()
 
-    def _emergency_shutdown_unlocked(self) -> None:
-        """Immediate safe shutdown on fault (internal, no lock).
+    def _assert_sd_disable_unlocked(self) -> None:
+        """Assert SD disable on fault (internal, no lock).
 
-        Best-effort shutdown that continues even if individual
-        operations fail. Logs errors but does not raise.
+        Only disables module output via SD pin — does NOT attempt
+        to power down rails.  Full rail shutdown requires an explicit
+        call to shutdown().
+
+        Rationale: during a fault, issuing PSU commands over UDP may
+        make things worse or mask the real issue.  The SD pin disable
+        is the most critical safety action and is a single serial
+        command to the MCU.
 
         Note: Caller must hold _lock or ensure exclusive access.
         """
-        self._logger.warning("Emergency shutdown triggered")
-
-        # First priority: disable module (SD = DISABLE)
+        self._logger.warning("Fault response: asserting SD disable (module output off)")
         try:
             self._mcu.set_shutdown(disable=True)
         except Exception as e:
-            self._logger.error(f"MCU SD disable failed: {e}")
-
-        # Datasheet power-down order: controls → VCC → VPD
-        # Step 2: Control rails to 0V first (avoids driving pins above VCC when VCC=0V)
-        for rail in [RailName.VOA_CTRL, RailName.GA_X, RailName.GA_Y, RailName.OA_X, RailName.OA_Y]:
-            try:
-                self._rails.disable_rail(rail)
-            except Exception as e:
-                self._logger.error(f"Emergency: {rail.value} disable failed: {e}")
-        # Step 3: VCC off (amplifier supply)
-        try:
-            self._rails.disable_rail(RailName.VCC_3V3)
-        except Exception as e:
-            self._logger.error(f"Emergency: VCC disable failed: {e}")
-        # Step 4: VPD off last (photodiode supply)
-        try:
-            self._rails.disable_rail(RailName.VPD_5V0)
-        except Exception as e:
-            self._logger.error(f"Emergency: VPD disable failed: {e}")
+            self._logger.error(f"MCU SD disable failed during fault response: {e}")
 
     # --- MCU error → fault helper ---
 
@@ -539,7 +525,7 @@ class FIM24725Service:
 
         except Exception as e:
             self._logger.error(f"Shutdown error: {e}")
-            self._emergency_shutdown_unlocked()
+            self._assert_sd_disable_unlocked()
 
     # --- Named Rail API ---
 
@@ -906,7 +892,7 @@ class FIM24725Service:
 
         except Exception as e:
             self._logger.error(f"Shutdown error: {e}")
-            self._emergency_shutdown_unlocked()
+            self._assert_sd_disable_unlocked()
 
     def __enter__(self) -> FIM24725Service:
         return self

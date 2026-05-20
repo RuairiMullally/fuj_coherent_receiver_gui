@@ -72,7 +72,7 @@ This mapping is defined once in `RailRegistry` and never duplicated.
 
 - **OVP/OCP before enable**: Protections are always programmed before output is enabled
 - **Bounds validation**: All setpoints are clamped to safe ranges
-- **Fault triggers shutdown**: State machine automatically calls emergency shutdown on fault
+- **Fault asserts SD disable**: State machine automatically disables module output (SD pin) on fault; full rail shutdown requires explicit `shutdown()` call
 - **Sequence enforcement**: Startup/shutdown follow strict ordering
 
 ### 4. Manages System State
@@ -116,7 +116,7 @@ All public methods are protected by a reentrant lock (`threading.RLock`):
 
 - Prevents race conditions between concurrent callers
 - Ensures state consistency during multi-step operations
-- Uses `RLock` to allow internal method calls (e.g., shutdown calling emergency_shutdown)
+- Uses `RLock` to allow internal method calls (e.g., shutdown calling _assert_sd_disable)
 - Properties are also protected for consistent reads
 
 ### 8. Logging

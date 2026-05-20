@@ -4,7 +4,7 @@ Python library for high-level control of the FIM24725 coherent optical receiver 
 
 This library provides:
 
-- **Safe power sequencing** (automatic bring-up/shutdown)
+- **Safe power sequencing** (automatic bring-up, manual shutdown)
 - **Named rail control** (no PSU/channel confusion)
 - **State management** (OFF, STARTING, READY, FAULT)
 - **Operating mode control** (AGC/MGC)

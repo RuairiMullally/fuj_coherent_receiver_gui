@@ -168,7 +168,7 @@ OFF ──────────────→ STARTING ───────
 | `STARTING` | Power-on sequence running: PSU rails brought up, MCU handshake. |
 | `READY` | All rails verified, MCU connected; control commands accepted. |
 | `SHUTTING_DOWN` | Orderly power-down sequence in progress. |
-| `FAULT` | An unrecoverable error occurred; hardware has been made safe. Call `shutdown()` to return to `OFF`. |
+| `FAULT` | A fault occurred; module output disabled via SD pin. Call `shutdown()` to power down rails and return to `OFF`. |
 
 Transitions are enforced by `StateMachine`. Any step can transition to `FAULT`.
 `startup()` is never called automatically — the operator triggers it via `POST /api/v1/startup`.

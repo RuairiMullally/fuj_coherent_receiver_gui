@@ -25,7 +25,7 @@ These signals require a microcontroller with digital output and ADC capability. 
 1. **ADR-002 MCUInterface Protocol:** The services layer defines an `MCUInterface` Protocol; any MCU backend must implement its seven methods/properties
 2. **Pi is the host:** The Raspberry Pi runs `FIM24725Service` and owns all application state; the Arduino is a stateless peripheral — it executes commands and reports sensor readings
 3. **No blocking firmware:** Firmware must not block the main loop; 500ms telemetry must be emitted regardless of command traffic
-4. **Fault propagation:** Hardware faults detected on the Arduino (pin readback mismatch) must propagate to the Pi and trigger a service-level emergency shutdown
+4. **Fault propagation:** Hardware faults detected on the Arduino (pin readback mismatch) must propagate to the Pi and trigger a service-level fault (SD disable asserted automatically; full shutdown is manual)
 5. **Startup confirmation:** The service must not proceed with startup unless the Arduino has confirmed its initial state, preventing operation with wrong/missing firmware
 
 ---
@@ -115,7 +115,7 @@ Command responses are always exactly one line. Telemetry lines are unsolicited a
 
 ### 5. MCU Error → Service Fault Propagation
 
-`FIM24725Service` catches `MCUError` in runtime methods and triggers an emergency shutdown:
+`FIM24725Service` catches `MCUError` in runtime methods and transitions to FAULT (SD disable is asserted automatically; full rail shutdown requires explicit `shutdown()` call):
 
 ```python
 def _fault_on_mcu_error(self, context: str, e: MCUError) -> None:
@@ -147,7 +147,7 @@ The Arduino is symlinked to `/dev/arduino` on the Pi via udev matching FTDI FT23
 - **Firmware-confirmed startup:** `INIT:` handshake ensures the correct firmware is running before any sequence proceeds
 - **Clean separation:** Pi owns all state; Arduino is a dumb peripheral — simplifies firmware and avoids state synchronisation problems
 - **Non-blocking firmware:** `millis()`-based telemetry and character-buffer serial read ensure 500ms cadence is maintained regardless of command load
-- **Fault transparency:** Pin readback errors (`ERR:PIN_FAULT:*`) propagate immediately to the service fault state and trigger emergency shutdown
+- **Fault transparency:** Pin readback errors (`ERR:PIN_FAULT:*`) propagate immediately to the service fault state, asserting SD disable (module output off); full rail shutdown requires explicit operator action
 - **Protocol simplicity:** ASCII line-based protocol is human-readable and debuggable with any serial terminal (e.g., `minicom -b 115200 -D /dev/arduino`)
 - **Thread-safe telemetry:** Background reader with `threading.Lock` prevents race conditions between telemetry updates and service reads
 

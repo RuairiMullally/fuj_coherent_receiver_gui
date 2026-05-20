@@ -72,12 +72,17 @@ class RailMeasurement(BaseModel):
 
 
 class PeakIndicators(BaseModel):
-    """Peak indicator readings from MCU ADC."""
+    """Peak indicator readings from MCU ADC.
 
-    pi_xi: float = Field(ge=0.0, le=2.0)
-    pi_xq: float = Field(ge=0.0, le=2.0)
-    pi_yi: float = Field(ge=0.0, le=2.0)
-    pi_yq: float = Field(ge=0.0, le=2.0)
+    Signal range is 0–2 V but the ADC (3.3 V AREF) can read up to 3.3 V.
+    Values outside the nominal 0–2 V range are accepted so that a single
+    out-of-range channel does not discard the entire telemetry frame.
+    """
+
+    pi_xi: float = Field(ge=0.0, le=3.3)
+    pi_xq: float = Field(ge=0.0, le=3.3)
+    pi_yi: float = Field(ge=0.0, le=3.3)
+    pi_yq: float = Field(ge=0.0, le=3.3)
 
 
 class SystemSnapshot(BaseModel):
