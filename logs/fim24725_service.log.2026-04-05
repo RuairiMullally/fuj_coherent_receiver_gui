@@ -1,0 +1,99 @@
+2026-04-05 11:28:35.336 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-04-05 11:28:35.338 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=10.10.20.137:20002
+2026-04-05 11:28:35.339 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-04-05 18:10:53.623 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-04-05 18:10:53.625 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=10.10.20.137:20002
+2026-04-05 18:10:53.625 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-04-05 18:10:53.627 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-04-05 18:10:53.627 | fim24725.service | INFO | FIM24725Service closed
+2026-04-05 18:10:53.627 | fim24725.api | INFO | Shutdown complete
+2026-04-05 18:11:06.813 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-04-05 18:11:06.814 | fim24725.service | INFO | FIM24725Service initialized: PSU1=10.10.10.137:20001, PSU2=10.10.20.137:20002
+2026-04-05 18:11:06.815 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-04-05 18:11:06.816 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-04-05 18:11:06.816 | fim24725.service | INFO | FIM24725Service closed
+2026-04-05 18:11:06.816 | fim24725.api | INFO | Shutdown complete
+2026-04-05 18:13:18.753 | fim24725.service | INFO | === Starting FIM24725 Startup Sequence ===
+2026-04-05 18:13:18.755 | fim24725.state | INFO | State: OFF -> STARTING
+2026-04-05 18:13:18.756 | fim24725.service | INFO | Step 0: Locking PSU front panels
+2026-04-05 18:13:18.826 | fim24725.service | INFO | Step 1: Ensuring safe initial state
+2026-04-05 18:13:18.828 | fim24725.mcu.mock | INFO | SD -> DISABLE (D2 LOW → SD LOW)
+2026-04-05 18:13:18.829 | fim24725.mcu.mock | INFO | MC/AGC -> AGC (HIGH)
+2026-04-05 18:13:18.830 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-04-05 18:13:18.862 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-04-05 18:13:18.894 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-04-05 18:13:18.925 | fim24725.rails | INFO | GA_X: Disabling
+2026-04-05 18:13:18.957 | fim24725.rails | INFO | GA_Y: Disabling
+2026-04-05 18:13:18.988 | fim24725.rails | INFO | OA_X: Disabling
+2026-04-05 18:13:19.019 | fim24725.rails | INFO | OA_Y: Disabling
+2026-04-05 18:13:19.050 | fim24725.service | INFO | Step 2: Programming protections and setpoints
+2026-04-05 18:13:19.051 | fim24725.rails | INFO | VCC_3V3: Programming OVP=3.600V, OCP=0.700A, Vset=3.300V, Iset=0.500A
+2026-04-05 18:13:21.239 | fim24725.service | ERROR | Startup failed: timed out
+2026-04-05 18:13:21.240 | fim24725.state | ERROR | FAULT from STARTING: Startup failed: timed out
+2026-04-05 18:13:21.240 | fim24725.service | WARNING | Emergency shutdown triggered
+2026-04-05 18:13:21.240 | fim24725.mcu.mock | INFO | SD -> DISABLE (D2 LOW → SD LOW)
+2026-04-05 18:13:21.240 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-04-05 18:13:21.271 | fim24725.rails | INFO | GA_X: Disabling
+2026-04-05 18:13:21.302 | fim24725.rails | INFO | GA_Y: Disabling
+2026-04-05 18:13:21.333 | fim24725.rails | INFO | OA_X: Disabling
+2026-04-05 18:13:21.364 | fim24725.rails | INFO | OA_Y: Disabling
+2026-04-05 18:13:21.395 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-04-05 18:13:21.426 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-04-05 18:14:01.077 | fim24725.service | INFO | === Starting FIM24725 Shutdown Sequence ===
+2026-04-05 18:14:01.077 | fim24725.service | INFO | Step 1: Disabling module output (D2 LOW → SD LOW = shutdown active)
+2026-04-05 18:14:01.078 | fim24725.mcu.mock | INFO | SD -> DISABLE (D2 LOW → SD LOW)
+2026-04-05 18:14:01.078 | fim24725.service | INFO | Step 2: Disabling control rails (VOA, GA, OA → 0V)
+2026-04-05 18:14:01.078 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-04-05 18:14:01.109 | fim24725.rails | INFO | GA_X: Disabling
+2026-04-05 18:14:01.140 | fim24725.rails | INFO | GA_Y: Disabling
+2026-04-05 18:14:01.170 | fim24725.rails | INFO | OA_X: Disabling
+2026-04-05 18:14:01.201 | fim24725.rails | INFO | OA_Y: Disabling
+2026-04-05 18:14:01.232 | fim24725.service | INFO | Step 3: Disabling VCC_3V3 (amplifier supply)
+2026-04-05 18:14:01.232 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-04-05 18:14:01.262 | fim24725.service | INFO | Step 4: Disabling VPD_5V0 (photodiode supply, last)
+2026-04-05 18:14:01.263 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-04-05 18:14:01.293 | fim24725.state | INFO | State: FAULT -> OFF
+2026-04-05 18:14:01.293 | fim24725.service | INFO | Step 6: Unlocking PSU front panels
+2026-04-05 18:14:01.354 | fim24725.service | INFO | === Shutdown Complete ===
+2026-04-05 18:31:23.118 | fim24725.service | INFO | === Starting FIM24725 Startup Sequence ===
+2026-04-05 18:31:23.119 | fim24725.state | INFO | State: OFF -> STARTING
+2026-04-05 18:31:23.119 | fim24725.service | INFO | Step 0: Locking PSU front panels
+2026-04-05 18:31:23.180 | fim24725.service | INFO | Step 1: Ensuring safe initial state
+2026-04-05 18:31:23.181 | fim24725.mcu.mock | INFO | SD -> DISABLE (D2 LOW → SD LOW)
+2026-04-05 18:31:23.181 | fim24725.mcu.mock | INFO | MC/AGC -> AGC (HIGH)
+2026-04-05 18:31:23.181 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-04-05 18:31:23.212 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-04-05 18:31:23.244 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-04-05 18:31:23.275 | fim24725.rails | INFO | GA_X: Disabling
+2026-04-05 18:31:23.307 | fim24725.rails | INFO | GA_Y: Disabling
+2026-04-05 18:31:23.338 | fim24725.rails | INFO | OA_X: Disabling
+2026-04-05 18:31:23.369 | fim24725.rails | INFO | OA_Y: Disabling
+2026-04-05 18:31:23.400 | fim24725.service | INFO | Step 2: Programming protections and setpoints
+2026-04-05 18:31:23.400 | fim24725.rails | INFO | VCC_3V3: Programming OVP=3.600V, OCP=0.700A, Vset=3.300V, Iset=0.500A
+2026-04-05 18:31:25.586 | fim24725.service | ERROR | Startup failed: timed out
+2026-04-05 18:31:25.587 | fim24725.state | ERROR | FAULT from STARTING: Startup failed: timed out
+2026-04-05 18:31:25.587 | fim24725.service | WARNING | Emergency shutdown triggered
+2026-04-05 18:31:25.587 | fim24725.mcu.mock | INFO | SD -> DISABLE (D2 LOW → SD LOW)
+2026-04-05 18:31:25.588 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-04-05 18:31:25.618 | fim24725.rails | INFO | GA_X: Disabling
+2026-04-05 18:31:25.649 | fim24725.rails | INFO | GA_Y: Disabling
+2026-04-05 18:31:25.681 | fim24725.rails | INFO | OA_X: Disabling
+2026-04-05 18:31:25.712 | fim24725.rails | INFO | OA_Y: Disabling
+2026-04-05 18:31:25.743 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-04-05 18:31:25.774 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-04-05 18:31:35.738 | fim24725.service | INFO | === Starting FIM24725 Shutdown Sequence ===
+2026-04-05 18:31:35.739 | fim24725.service | INFO | Step 1: Disabling module output (D2 LOW → SD LOW = shutdown active)
+2026-04-05 18:31:35.739 | fim24725.mcu.mock | INFO | SD -> DISABLE (D2 LOW → SD LOW)
+2026-04-05 18:31:35.739 | fim24725.service | INFO | Step 2: Disabling control rails (VOA, GA, OA → 0V)
+2026-04-05 18:31:35.739 | fim24725.rails | INFO | VOA_CTRL: Disabling
+2026-04-05 18:31:35.770 | fim24725.rails | INFO | GA_X: Disabling
+2026-04-05 18:31:35.802 | fim24725.rails | INFO | GA_Y: Disabling
+2026-04-05 18:31:35.833 | fim24725.rails | INFO | OA_X: Disabling
+2026-04-05 18:31:35.864 | fim24725.rails | INFO | OA_Y: Disabling
+2026-04-05 18:31:35.895 | fim24725.service | INFO | Step 3: Disabling VCC_3V3 (amplifier supply)
+2026-04-05 18:31:35.895 | fim24725.rails | INFO | VCC_3V3: Disabling
+2026-04-05 18:31:35.926 | fim24725.service | INFO | Step 4: Disabling VPD_5V0 (photodiode supply, last)
+2026-04-05 18:31:35.926 | fim24725.rails | INFO | VPD_5V0: Disabling
+2026-04-05 18:31:35.957 | fim24725.state | INFO | State: FAULT -> OFF
+2026-04-05 18:31:35.957 | fim24725.service | INFO | Step 6: Unlocking PSU front panels
+2026-04-05 18:31:36.019 | fim24725.service | INFO | === Shutdown Complete ===
