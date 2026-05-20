@@ -493,3 +493,68 @@ Recommendation:
 
 ---
 
+## Class Diagram
+
+```mermaid
+classDiagram
+    direction TB
+
+    class PsuTransportUDP {
+        -Socket _sock
+        -str psu_ip
+        -int psu_port
+        -str local_ip
+        -int local_port
+        +write(cmd)
+        +query_str(cmd) str
+        +query_raw(cmd) bytes
+        +close()
+    }
+
+    class MP71050x {
+        +str name
+        -Lock _lock
+        +identify() DeviceId
+        +lock_front_panel(locked)
+        +beep(enabled)
+        +status() Status
+        +set_output(channels, enabled)
+        +channel(ch) Channel
+    }
+
+    class Channel {
+        -int ch
+        +set_voltage(volts)
+        +set_current_limit(amps)
+        +get_voltage_setpoint() float
+        +get_current_setpoint() float
+        +measure_voltage() float
+        +measure_current() float
+        +output(enabled)
+        +set_ovp(volts, enabled)
+        +set_ocp(amps, enabled)
+        +get_ovp() tuple
+        +get_ocp() tuple
+    }
+
+    class DeviceId {
+        <<dataclass>>
+        +str model
+        +str version
+        +str serial
+    }
+
+    class Status {
+        <<dataclass>>
+        +tuple~str~ mode
+        +tuple~bool~ output
+    }
+
+    MP71050x "1" *-- "1" PsuTransportUDP : owns
+    MP71050x "1" *-- "1..4" Channel : creates
+    MP71050x ..> DeviceId : returns
+    MP71050x ..> Status : returns
+```
+
+---
+

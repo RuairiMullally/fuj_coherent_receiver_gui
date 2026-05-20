@@ -2,6 +2,32 @@
 
 ## System Overview
 
+### Block Diagram
+
+```mermaid
+flowchart TD
+    Browser["Lab Technician\n(Browser)"]
+    Dash["Dash Frontend\nfuj_gui · :8050"]
+    API["FastAPI Backend\nfuj_backend · :8000"]
+    SVC["FIM24725 Service\nState machine · Rail controller · MCU interface"]
+    PSU1["PSU 1 — MP71050x\nVCC_3V3 · VPD_5V0 · VOA_CTRL\n10.10.10.137 UDP"]
+    PSU2["PSU 2 — MP71050x\nGA_X · GA_Y · OA_X · OA_Y\n10.10.20.137 UDP"]
+    MCU["Arduino Uno R3\nSD · MC/AGC · PI × 4 · MPD × 2\n/dev/arduino USB serial"]
+    HW["FIM24725\nCoherent Receiver Module"]
+
+    Browser -->|"HTTP :8050"| Dash
+    Dash -->|"HTTP REST :8000"| API
+    API -->|"dependency injection"| SVC
+    SVC -->|"UDP"| PSU1
+    SVC -->|"UDP"| PSU2
+    SVC -->|"115200 baud serial"| MCU
+    PSU1 -->|"VCC_3V3 · VPD_5V0 · VOA_CTRL rails"| HW
+    PSU2 -->|"GA_X · GA_Y · OA_X · OA_Y rails"| HW
+    MCU -->|"SD · MC/AGC (CMOS)\nPI_X/Y · MPD (ADC)"| HW
+```
+
+### Detailed ASCII diagram
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    Lab Technician (Browser)                             │

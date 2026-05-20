@@ -205,7 +205,7 @@ Execute the full startup sequence:
 1. Verify safe initial state (SD=DISABLE, all off)
 2. Program OVP/OCP protections
 3. Enable VPD_5V0, verify 5.0V (photodiode bias FIRST per app notes)
-4. Enable VCC_3V3, verify 3.3V / 280-480mA (amplifier supply SECOND per app notes)
+4. Enable VCC_3V3, verify 3.3V / 120-480mA (amplifier supply SECOND per app notes)
 5. Set initial controls (GA=0V, OA=0.5V min, VOA=2.5V)
 6. Enable control rail outputs; confirm PSU1 (VOA_CTRL) and PSU2 (GA_X) responsive via VOUT? query
 7. Settling delay (500ms)
@@ -701,3 +701,125 @@ See [ADR-002: FIM24725 Services Layer](adr/ADR-002-services-layer.md) for archit
 - **MPD**: Monitor Photodiode - measures optical power independent of gain
 - **SD**: Shutdown pin - enables/disables module output
 - **TIA**: Transimpedance Amplifier - converts photodiode current to voltage
+
+---
+
+## State Machine Diagram
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> OFF
+    OFF --> STARTING : startup()
+    STARTING --> READY : all steps pass
+    READY --> SHUTTING_DOWN : shutdown()
+    SHUTTING_DOWN --> OFF : complete
+
+    STARTING --> FAULT : any step fails
+    READY --> FAULT : hardware error
+    SHUTTING_DOWN --> FAULT : error
+    FAULT --> SHUTTING_DOWN : shutdown()
+```
+
+---
+
+## Service Composition Diagram
+
+```mermaid
+classDiagram
+    direction TB
+
+    class FIM24725Service {
+        -RLock _lock
+        +startup(mode)
+        +shutdown()
+        +set_voa(volts)
+        +set_oa_x(volts)
+        +set_oa_y(volts)
+        +set_ga_x(volts)
+        +set_ga_y(volts)
+        +set_mode(mode)
+        +get_snapshot() SystemSnapshot
+        +read_peak_indicators() PeakIndicators
+        +read_mpd() float
+        +sweep_ga(...) list
+        +close()
+    }
+
+    class StateMachine {
+        -SystemState _state
+        -OperatingMode _mode
+        -FaultInfo _fault_info
+        +transition_to(state)
+        +fault(info)
+        +require_state(states)
+        +set_mode(mode)
+    }
+
+    class RailController {
+        -dict _rail_states
+        -dict _channel_cache
+        +program_all_protections()
+        +enable_rail(rail)
+        +disable_rail(rail)
+        +set_voa(volts)
+        +set_oa_x(volts)
+        +set_ga_x(volts)
+        +measure_rail(rail) RailMeasurement
+        +verify_rail(rail) bool
+        +lock_panels()
+    }
+
+    class RailRegistry {
+        <<singleton>>
+        +VCC_3V3$ RailConfig
+        +VPD_5V0$ RailConfig
+        +VOA_CTRL$ RailConfig
+        +GA_X$ RailConfig
+        +GA_Y$ RailConfig
+        +OA_X$ RailConfig
+        +OA_Y$ RailConfig
+        +get(name)$ RailConfig
+    }
+
+    class MCUInterface {
+        <<protocol>>
+        +set_shutdown(disable) bool
+        +set_mode(mode) OperatingMode
+        +read_peak_indicators() PeakIndicators
+        +read_mpd() float
+        +is_connected() bool
+    }
+
+    class ArduinoMCU {
+        -Serial _serial
+        -Thread _reader_thread
+        -Queue _response_queue
+        -Lock _tele_lock
+    }
+
+    class MockMCU {
+    }
+
+    class MP71050x {
+        -Lock _lock
+        +channel(ch) Channel
+    }
+
+    class PsuTransportUDP {
+        -Socket _sock
+    }
+
+    FIM24725Service "1" *-- "1" StateMachine : owns
+    FIM24725Service "1" *-- "1" RailController : owns
+    FIM24725Service "1" *-- "1" MCUInterface : owns
+
+    RailController "1" *-- "2" MP71050x : PSU1, PSU2
+    RailController ..> RailRegistry : reads config
+
+    MP71050x "1" *-- "1" PsuTransportUDP : owns
+
+    ArduinoMCU ..|> MCUInterface : satisfies
+    MockMCU ..|> MCUInterface : satisfies
+```
