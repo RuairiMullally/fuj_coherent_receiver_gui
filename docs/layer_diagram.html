@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Software Layer Diagram</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #fff;
+    color: #222;
+    padding: 32px;
+    width: 780px;
+    margin: 0 auto;
+  }
+  h2 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    text-align: center;
+    color: #333;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .layer {
+    width: 100%;
+    border: 2px solid #333;
+    padding: 14px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+  }
+  .layer + .layer {
+    border-top: none;
+  }
+
+  .layer-name {
+    font-weight: 700;
+    font-size: 13px;
+    min-width: 170px;
+    flex-shrink: 0;
+  }
+  .layer-desc {
+    font-size: 11px;
+    color: #444;
+    line-height: 1.5;
+  }
+  .layer-desc ul {
+    margin: 0;
+    padding-left: 16px;
+  }
+  .layer-desc li {
+    margin-bottom: 1px;
+  }
+
+  /* Colour coding */
+  .layer-gui {
+    background: #e8f4fd;
+    border-color: #2980b9;
+  }
+  .layer-gui .layer-name { color: #2980b9; }
+
+  .layer-api {
+    background: #eaf7ea;
+    border-color: #27ae60;
+  }
+  .layer-api .layer-name { color: #27ae60; }
+
+  .layer-service {
+    background: #fdecea;
+    border-color: #c0392b;
+    border-width: 3px;
+    padding: 16px 20px;
+  }
+  .layer-service .layer-name { color: #c0392b; }
+
+  .layer-hal {
+    background: #fef9e7;
+    border-color: #d4a017;
+  }
+  .layer-hal .layer-name { color: #b7950b; }
+
+  .layer-hw {
+    background: #f4f4f4;
+    border-color: #555;
+  }
+  .layer-hw .layer-name { color: #555; }
+
+  /* Interface labels between layers */
+  .interface {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .interface-line {
+    flex: 1;
+    height: 0;
+    border-top: 1px dashed #aaa;
+  }
+  .interface-label {
+    font-size: 9px;
+    color: #777;
+    white-space: nowrap;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  /* Safety boundary marker */
+  .safety-marker {
+    position: absolute;
+    right: -120px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .safety-bracket {
+    width: 12px;
+    height: 60px;
+    border: 2px solid #c0392b;
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+  }
+  .safety-text {
+    font-size: 10px;
+    font-weight: 700;
+    color: #c0392b;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    letter-spacing: 0.5px;
+  }
+
+  /* Wrapper for safety annotation */
+  .stack-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+  .stack-inner {
+    position: relative;
+    width: 580px;
+  }
+
+  /* Arrows */
+  .arrow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 2px 0;
+  }
+  .arrow-down {
+    font-size: 12px;
+    color: #888;
+    line-height: 1;
+  }
+
+  /* Caption */
+  .diagram-caption {
+    text-align: center;
+    font-size: 11px;
+    color: #555;
+    margin-top: 14px;
+    font-style: italic;
+    max-width: 620px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Defence in depth sidebar */
+  .did-sidebar {
+    position: absolute;
+    left: -145px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 10px 0;
+  }
+  .did-pip {
+    font-size: 8px;
+    color: #888;
+    text-align: right;
+    line-height: 1.3;
+    max-width: 120px;
+  }
+  .did-label {
+    position: absolute;
+    left: -148px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    font-size: 9px;
+    font-weight: 700;
+    color: #aaa;
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<h2>Figure X — Software Layer Architecture</h2>
+
+<div class="stack-wrapper">
+  <div class="stack-inner">
+
+    <!-- GUI -->
+    <div class="layer layer-gui">
+      <div class="layer-name">Presentation<br/>Dash GUI</div>
+      <div class="layer-desc">
+        <ul>
+          <li>Renders controls, telemetry graph, log panel</li>
+          <li>Polls API for status updates (500 ms interval)</li>
+          <li>No hardware access — presentation only</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="interface">
+      <div class="interface-line"></div>
+      <div class="interface-label">HTTP &nbsp;(localhost:8000, persistent httpx session)</div>
+      <div class="interface-line"></div>
+    </div>
+
+    <!-- API -->
+    <div class="layer layer-api">
+      <div class="layer-name">API Gateway<br/>FastAPI</div>
+      <div class="layer-desc">
+        <ul>
+          <li>Routes HTTP requests to service methods</li>
+          <li>Pydantic input validation (rejects out-of-range values)</li>
+          <li>Rate limiting per IP (SlowAPI)</li>
+          <li>Exception &rarr; HTTP status mapping</li>
+          <li>No business logic — thin routing layer</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="interface">
+      <div class="interface-line"></div>
+      <div class="interface-label">Python method calls &nbsp;(via FastAPI thread pool)</div>
+      <div class="interface-line"></div>
+    </div>
+
+    <!-- Service — highlighted -->
+    <div class="layer layer-service">
+      <div class="layer-name">Service Layer<br/>FIM24725Service</div>
+      <div class="layer-desc">
+        <ul>
+          <li><strong>State machine</strong> — enforces valid transitions (OFF&rarr;STARTING&rarr;READY&rarr;SHUTTING_DOWN)</li>
+          <li><strong>Power sequencing</strong> — VPD before VCC on startup, VCC before VPD on shutdown</li>
+          <li><strong>Bounds enforcement</strong> — clamps voltages to safe operating ranges</li>
+          <li><strong>Write-then-verify</strong> — reads back every setpoint from hardware</li>
+          <li><strong>Thread safety</strong> — RLock serialises all concurrent access</li>
+          <li><strong>Fault handling</strong> — emergency shutdown on any failure</li>
+        </ul>
+      </div>
+      <!-- Safety boundary annotation -->
+      <div class="safety-marker">
+        <div class="safety-bracket"></div>
+        <div class="safety-text">SAFETY BOUNDARY</div>
+      </div>
+    </div>
+
+    <div class="interface">
+      <div class="interface-line"></div>
+      <div class="interface-label">Python method calls &nbsp;(composition, not inheritance)</div>
+      <div class="interface-line"></div>
+    </div>
+
+    <!-- HAL -->
+    <div class="layer layer-hal">
+      <div class="layer-name">Hardware Abstraction<br/>PSU HAL + MCU</div>
+      <div class="layer-desc">
+        <ul>
+          <li>Translates method calls to protocol-specific commands</li>
+          <li>PSU: UDP socket, SCPI-like command strings</li>
+          <li>MCU: serial UART, ASCII set-confirm protocol</li>
+          <li>Policy-free — no bounds checking, sequencing, or safety logic</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="interface">
+      <div class="interface-line"></div>
+      <div class="interface-label">UDP (10.10.10.x / 10.10.20.x) &nbsp;&bull;&nbsp; UART Serial (115200 baud)</div>
+      <div class="interface-line"></div>
+    </div>
+
+    <!-- Hardware -->
+    <div class="layer layer-hw">
+      <div class="layer-name">Hardware<br/>Control &amp; Power</div>
+      <div class="layer-desc">
+        <ul>
+          <li>2&times; MP710508 PSUs — OVP/OCP hardware protections (last line of defence)</li>
+          <li>Arduino Uno R3 — SD shutdown pin, AGC/MGC mode pin, ADC telemetry</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="interface">
+      <div class="interface-line"></div>
+      <div class="interface-label">Electrical &nbsp;(power rails, control voltages, analog signals)</div>
+      <div class="interface-line"></div>
+    </div>
+
+    <!-- FIM24725 -->
+    <div class="layer" style="background: #f0e6f6; border-color: #7d3c98;">
+      <div class="layer-name" style="color: #7d3c98;">Optical Module<br/>FIM24725</div>
+      <div class="layer-desc">
+        <ul>
+          <li>Passive recipient of power and control signals — no programmable interface</li>
+          <li>Receives: VPD, VCC, VOA, OA, GA voltages; SD and MODE digital signals</li>
+          <li>Outputs: peak indicator voltages (PI) and monitor photodiode current (MPD)</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="diagram-caption">
+  Each layer depends only on the layer below it. The service layer (red border) is the single
+  authoritative safety boundary — it enforces state, sequencing, bounds, and verification.
+  Layers above cannot bypass it; layers below are policy-free. The FIM24725 has no
+  programmable interface — it responds only to the electrical signals provided by the
+  hardware layer above.
+</div>
+
+</body>
+</html>

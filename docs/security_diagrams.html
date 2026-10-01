@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Security & Remote Access Diagrams</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #fff;
+    color: #222;
+    padding: 32px;
+    width: 900px;
+    margin: 0 auto;
+  }
+  h2 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    text-align: center;
+    color: #333;
+  }
+  .diagram {
+    margin-bottom: 48px;
+  }
+  .diagram-caption {
+    text-align: center;
+    font-size: 11px;
+    color: #555;
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* ===== Diagram 1: Network zones ===== */
+  .zones {
+    display: flex;
+    gap: 0;
+    height: 340px;
+    border: 2px solid #333;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 16px 12px;
+    position: relative;
+  }
+
+  .zone-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 3px;
+    margin-bottom: 14px;
+  }
+
+  .zone-internet {
+    width: 22%;
+    background: #fde8e8;
+    border-right: 2.5px dashed #c0392b;
+  }
+  .zone-internet .zone-label {
+    background: #e74c3c;
+    color: #fff;
+  }
+
+  .zone-tailnet {
+    width: 40%;
+    background: #e8f4fd;
+    border-right: 2.5px dashed #2471a3;
+  }
+  .zone-tailnet .zone-label {
+    background: #2980b9;
+    color: #fff;
+  }
+
+  .zone-localhost {
+    width: 38%;
+    background: #e8fde8;
+  }
+  .zone-localhost .zone-label {
+    background: #27ae60;
+    color: #fff;
+  }
+
+  .zone-icon-box {
+    border: 1.5px solid #555;
+    border-radius: 5px;
+    padding: 10px 14px;
+    text-align: center;
+    font-size: 11px;
+    background: #fff;
+    margin: 6px 0;
+    min-width: 100px;
+  }
+  .zone-icon-box.dashed {
+    border-style: dashed;
+    border-color: #999;
+  }
+  .zone-icon-box .icon {
+    font-size: 22px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .zone-icon-box .sub {
+    font-size: 9px;
+    color: #777;
+    margin-top: 2px;
+  }
+
+  /* Arrows */
+  .arrow-container {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .arrow-line {
+    font-size: 9px;
+    color: #555;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .arrow-blocked {
+    color: #c0392b;
+    font-weight: 700;
+  }
+  .arrow-ok {
+    color: #27ae60;
+    font-weight: 600;
+  }
+
+  /* Big X for blocked */
+  .blocked-x {
+    font-size: 32px;
+    color: #e74c3c;
+    font-weight: 900;
+    margin: 20px 0;
+    opacity: 0.7;
+  }
+
+  /* Connector lines (SVG overlay) */
+  .zones-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  /* ===== Diagram 2: DERP relay ===== */
+  .derp-diagram {
+    position: relative;
+    height: 320px;
+    border: 2px solid #333;
+    border-radius: 6px;
+    background: #fafafa;
+    overflow: hidden;
+  }
+
+  .derp-box {
+    position: absolute;
+    border: 1.5px solid #555;
+    border-radius: 5px;
+    padding: 10px 14px;
+    text-align: center;
+    font-size: 11px;
+    background: #fff;
+  }
+  .derp-box .icon {
+    font-size: 20px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .derp-box .sub {
+    font-size: 9px;
+    color: #777;
+    margin-top: 2px;
+  }
+  .derp-box.relay {
+    border-color: #8e44ad;
+    background: #f5eef8;
+  }
+  .derp-box.cloud {
+    border-style: dashed;
+    border-color: #aaa;
+    background: #f9f9f9;
+  }
+
+  .derp-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .derp-label {
+    position: absolute;
+    font-size: 9px;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* ===== Pi internal detail ===== */
+  .pi-internal {
+    border: 1.5px solid #555;
+    border-radius: 5px;
+    padding: 8px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .pi-process {
+    border: 1px solid #aaa;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 10px;
+    text-align: center;
+    background: #f8f8f8;
+  }
+  .pi-arrow-down {
+    text-align: center;
+    font-size: 10px;
+    color: #888;
+    line-height: 1;
+  }
+  .pi-label-top {
+    font-size: 9px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 2px;
+  }
+
+  .scenario-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    color: #555;
+    background: #fafafa;
+    padding: 0 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- DIAGRAM 1: Network Zones                     -->
+<!-- ============================================ -->
+<div class="diagram">
+  <h2>Figure X — Network Access Zones</h2>
+  <div class="zones">
+    <svg class="zones-svg" viewBox="0 0 900 340">
+      <!-- Blocked: Internet → Pi -->
+      <line x1="175" y1="185" x2="240" y2="185" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="5,4"/>
+      <!-- Tailnet tunnel: User → Pi -->
+      <line x1="405" y1="140" x2="520" y2="140" stroke="#2980b9" stroke-width="2"/>
+      <polygon points="517,135 525,140 517,145" fill="#2980b9"/>
+      <!-- localhost: GUI → API -->
+      <line x1="690" y1="200" x2="690" y2="248" stroke="#27ae60" stroke-width="1.5"/>
+      <polygon points="685,245 690,255 695,245" fill="#27ae60"/>
+    </svg>
+
+    <!-- ZONE: Public Internet -->
+    <div class="zone zone-internet">
+      <div class="zone-label">Public Internet</div>
+      <div class="zone-icon-box dashed" style="margin-top: 30px;">
+        <span class="icon">&#127760;</span>
+        External client
+        <div class="sub">No route to Pi</div>
+      </div>
+      <div class="blocked-x">&times;</div>
+      <div style="font-size:9px; color:#c0392b; font-weight:600; text-align:center;">
+        No ports exposed<br/>No forwarding
+      </div>
+    </div>
+
+    <!-- ZONE: Tailnet -->
+    <div class="zone zone-tailnet">
+      <div class="zone-label">Tailscale Tailnet</div>
+      <div class="zone-icon-box" style="margin-top: 30px;">
+        <span class="icon">&#128187;</span>
+        Researcher laptop
+        <div class="sub">Authenticated device<br/>on tailnet</div>
+      </div>
+      <div style="margin-top: 20px; text-align: center;">
+        <div style="font-size: 9px; color: #2980b9; font-weight: 600;">
+          WireGuard tunnel
+        </div>
+        <div style="font-size: 9px; color: #555; margin-top: 4px;">
+          Encrypted, authenticated<br/>
+          &rarr; port 8050 only
+        </div>
+      </div>
+      <div class="zone-icon-box dashed" style="margin-top: 20px; border-color: #2980b9;">
+        <span style="font-size:9px; color:#2980b9; font-weight:600;">Tailscale ACL</span>
+        <div class="sub">Restricts which users<br/>can reach the Pi</div>
+      </div>
+    </div>
+
+    <!-- ZONE: Raspberry Pi (localhost) -->
+    <div class="zone zone-localhost">
+      <div class="zone-label">Raspberry Pi (localhost)</div>
+      <div class="pi-internal" style="margin-top: 16px;">
+        <div class="pi-label-top">Application stack</div>
+        <div class="pi-process" style="border-color: #2980b9;">
+          <strong>Dash GUI</strong><br/>
+          <span style="font-size:9px; color:#555;">:8050 &mdash; 0.0.0.0</span>
+        </div>
+        <div class="pi-arrow-down">&darr; HTTP (loopback)</div>
+        <div class="pi-process" style="border-color: #27ae60;">
+          <strong>FastAPI</strong><br/>
+          <span style="font-size:9px; color:#555;">:8000 &mdash; 127.0.0.1 only</span>
+        </div>
+        <div class="pi-arrow-down">&darr; Serial / UDP</div>
+        <div class="pi-process" style="border-color: #888;">
+          <strong>Hardware</strong><br/>
+          <span style="font-size:9px; color:#555;">MCU + PSUs</span>
+        </div>
+      </div>
+      <div style="margin-top: 8px; text-align: center; font-size: 9px; color: #555;">
+        CORS + TrustedHost<br/>reject non-localhost origins
+      </div>
+    </div>
+  </div>
+  <div class="diagram-caption">
+    Three network zones: the public internet has no route to the device; authenticated Tailscale peers
+    reach the GUI on port 8050; the API on port 8000 is bound to loopback and accessible only to the co-located GUI.
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- DIAGRAM 2: Direct vs DERP relay              -->
+<!-- ============================================ -->
+<div class="diagram">
+  <h2>Figure X — Tailscale Connection Paths</h2>
+  <div class="derp-diagram" style="height: 340px;">
+    <svg class="derp-svg" viewBox="0 0 900 340">
+      <!-- Scenario A: direct -->
+      <line x1="160" y1="82" x2="710" y2="82" stroke="#27ae60" stroke-width="2"/>
+      <polygon points="707,77 718,82 707,87" fill="#27ae60"/>
+      <text x="435" y="72" text-anchor="middle" font-size="10" fill="#27ae60" font-weight="600">Direct WireGuard (UDP)</text>
+      <text x="435" y="95" text-anchor="middle" font-size="9" fill="#888">Same LAN or NAT traversal succeeds</text>
+
+      <!-- Scenario B: relayed -->
+      <!-- Laptop to DERP -->
+      <line x1="160" y1="260" x2="395" y2="215" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <polygon points="390,210 400,213 388,218" fill="#8e44ad"/>
+      <!-- DERP to Pi -->
+      <line x1="530" y1="215" x2="710" y2="260" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <polygon points="707,255 718,260 707,265" fill="#8e44ad"/>
+
+      <text x="450" y="290" text-anchor="middle" font-size="9" fill="#888">Both peers behind restrictive NAT / firewall</text>
+    </svg>
+
+    <!-- Scenario labels -->
+    <div class="scenario-label" style="top: 38px; left: 20px;">(a) Direct path</div>
+    <div class="scenario-label" style="top: 155px; left: 20px;">(b) DERP-relayed path</div>
+
+    <!-- Divider -->
+    <div style="position:absolute; left:20px; right:20px; top:130px; border-top: 1px dashed #ccc;"></div>
+
+    <!-- Laptop (top) -->
+    <div class="derp-box" style="left: 40px; top: 58px; min-width: 110px;">
+      <span class="icon">&#128187;</span>
+      Researcher
+      <div class="sub">Tailscale client</div>
+    </div>
+
+    <!-- Pi (top) -->
+    <div class="derp-box" style="right: 60px; top: 58px; min-width: 110px;">
+      <span class="icon" style="color:#c0392b;">&#11044;</span>
+      Raspberry Pi
+      <div class="sub">Tailscale client</div>
+    </div>
+
+    <!-- Laptop (bottom) -->
+    <div class="derp-box" style="left: 40px; top: 235px; min-width: 110px;">
+      <span class="icon">&#128187;</span>
+      Researcher
+      <div class="sub">Tailscale client</div>
+    </div>
+
+    <!-- DERP relay -->
+    <div class="derp-box relay" style="left: 50%; transform: translateX(-50%); top: 180px; min-width: 140px;">
+      <strong>DERP Relay</strong>
+      <div class="sub">Tailscale-hosted<br/>HTTPS relay server</div>
+    </div>
+
+    <!-- Pi (bottom) -->
+    <div class="derp-box" style="right: 60px; top: 235px; min-width: 110px;">
+      <span class="icon" style="color:#c0392b;">&#11044;</span>
+      Raspberry Pi
+      <div class="sub">Tailscale client</div>
+    </div>
+
+    <!-- End-to-end note -->
+    <div style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:9px; color:#8e44ad; text-align:center;">
+      Traffic is end-to-end encrypted (WireGuard) in both scenarios &mdash; the DERP relay cannot read packet contents.
+    </div>
+  </div>
+  <div class="diagram-caption">
+    (a) When both devices can reach each other directly (e.g. same LAN), Tailscale establishes a peer-to-peer WireGuard tunnel.
+    (b) When NAT traversal fails, traffic is relayed through a Tailscale DERP server, but remains end-to-end encrypted.
+  </div>
+</div>
+
+</body>
+</html>

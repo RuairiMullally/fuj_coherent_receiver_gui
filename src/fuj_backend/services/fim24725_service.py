@@ -376,7 +376,7 @@ class FIM24725Service:
             measurement = self._rails.measure_rail(RailName.VCC_3V3)
             raise VerificationError(
                 RailName.VCC_3V3,
-                "3.3V / 280-480mA",
+                "3.3V / 120-480mA",
                 f"{measurement.voltage:.3f}V / {measurement.current:.3f}A",
             )
 

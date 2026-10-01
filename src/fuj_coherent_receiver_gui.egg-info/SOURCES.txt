@@ -37,6 +37,8 @@ src/fuj_gui/api_client.py
 src/fuj_gui/app.py
 src/fuj_gui/config.py
 src/fuj_gui/wsgi.py
+src/fuj_gui/assets/bootstrap.darkly.min.css
+src/fuj_gui/assets/graph_callbacks.js
 src/fuj_gui/callbacks/__init__.py
 src/fuj_gui/callbacks/graph.py
 src/fuj_gui/callbacks/logs.py

@@ -1,0 +1,10 @@
+2026-04-05 11:28:35.336 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-04-05 11:28:35.339 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-04-05 18:10:53.623 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-04-05 18:10:53.625 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-04-05 18:10:53.627 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-04-05 18:10:53.627 | fim24725.api | INFO | Shutdown complete
+2026-04-05 18:11:06.813 | fim24725.api | INFO | Starting FIM24725 API — mcu_mode=mock psu1=10.10.10.137 psu2=10.10.20.137
+2026-04-05 18:11:06.815 | fim24725.api | INFO | Service instantiated (state=OFF). Ready to accept requests.
+2026-04-05 18:11:06.816 | fim24725.api | INFO | Shutting down — closing service and MCU
+2026-04-05 18:11:06.816 | fim24725.api | INFO | Shutdown complete
